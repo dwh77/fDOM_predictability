@@ -163,13 +163,13 @@ reference date instead).
 
 ```{r fit-models}
 # NNETAR1: univariate (AR lags of fDOM only)
-NNETAR_lagonly <- fit_nnetar_model(
-  all_data     = ar_df,
-  train_cutoff = train_cutoff,
-  target       = "fDOM_1_QSU_daily",
-  covariates   = NULL,
-  model_name   = "NNETAR_lag_only"
-)
+# NNETAR_lagonly <- fit_nnetar_model(
+#   all_data     = ar_df,
+#   train_cutoff = train_cutoff,
+#   target       = "fDOM_1_QSU_daily",
+#   covariates   = NULL,
+#   model_name   = "NNETAR_lag_only"
+# )
 
 # NNETAR2: + in-lake (Temp, DO, Chla)
 NNETAR_lake <- fit_nnetar_model(
@@ -204,7 +204,6 @@ NNETAR_lake_catch <- fit_nnetar_model(
 ### Training plots
 
 ```{r plot-training, fig.height=4}
-NNETAR_lagonly$plot
 NNETAR_lake$plot
 NNETAR_catch$plot
 NNETAR_lake_catch$plot
@@ -344,7 +343,7 @@ forecasts_nnetar2 <- run_forecasts(NNETAR_lake,       ar_df, pred_dates)
 forecasts_nnetar3 <- run_forecasts(NNETAR_catch,      ar_df, pred_dates)
 forecasts_nnetar4 <- run_forecasts(NNETAR_lake_catch, ar_df, pred_dates)
 
-all_NNETAR_forecasts <- bind_rows(forecasts_nnetar1, forecasts_nnetar2,
+all_NNETAR_forecasts <- bind_rows(forecasts_nnetar2,
                                    forecasts_nnetar3, forecasts_nnetar4)
 
 glimpse(all_NNETAR_forecasts)

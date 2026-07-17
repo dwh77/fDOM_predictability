@@ -111,8 +111,11 @@ fit_arima_model <- function(all_data,
       model(arima = fable::ARIMA(formula = formula_obj))
   }
 
-  # Report selected ARIMA order
-  message(model_name, " | ", capture.output(report(arima_fit))[1])
+  # Report selected ARIMA order — model_sum() gives the compact structure
+  # (e.g. "LM w/ ARIMA(2,0,3) errors"), unlike report()'s first line which is
+  # just the series name
+  model_structure <- fabletools::model_sum(arima_fit$arima[[1]])
+  message(model_name, " | model structure: ", model_structure)
 
   # In-sample fitted values
   fitted_vals <- fitted(arima_fit) |>
@@ -143,13 +146,14 @@ fit_arima_model <- function(all_data,
   p_resid <- gg_tsresiduals(arima_fit)
 
   list(
-    model       = arima_fit,
-    plot        = p_fit,
-    resid_plot  = p_resid,
-    model_name  = model_name,
-    target      = target,
-    covariates  = covariates,
-    train_rmse  = train_rmse
+    model            = arima_fit,
+    plot             = p_fit,
+    resid_plot       = p_resid,
+    model_name       = model_name,
+    model_structure  = model_structure,
+    target           = target,
+    covariates       = covariates,
+    train_rmse       = train_rmse
   )
 }
 ```
@@ -161,13 +165,13 @@ and reused for all 2024 forecasts via `refit(reestimate = FALSE)`.
 
 ```{r fit-models}
 # ARIMA1: univariate (auto-selected order, no external regressors)
-ARIMA_lagonly <- fit_arima_model(
-  all_data     = ar_df,
-  train_cutoff = train_cutoff,
-  target       = "fDOM_1_QSU_daily",
-  covariates   = NULL,
-  model_name   = "ARIMA_lag_only"
-)
+# ARIMA_lagonly <- fit_arima_model(
+#   all_data     = ar_df,
+#   train_cutoff = train_cutoff,
+#   target       = "fDOM_1_QSU_daily",
+#   covariates   = NULL,
+#   model_name   = "ARIMA_lag_only"
+# )
 
 # ARIMA2: regression w/ ARIMA errors + in-lake (Temp, DO, Chla)
 ARIMA_lake <- fit_arima_model(
@@ -201,7 +205,6 @@ ARIMA_lake_catch <- fit_arima_model(
 ### Training plots
 
 ```{r plot-training, fig.height=4}
-ARIMA_lagonly$plot
 ARIMA_lake$plot
 ARIMA_catch$plot
 ARIMA_lake_catch$plot
@@ -210,17 +213,18 @@ ARIMA_lake_catch$plot
 ### Residual diagnostics
 
 ```{r plot-residuals, fig.height=5}
-ARIMA_lagonly$resid_plot
 ARIMA_lake$resid_plot
 ARIMA_catch$resid_plot
 ARIMA_lake_catch$resid_plot
+```
 
-ARIMA_lagonly$model
-ARIMA_lake$model
-ARIMA_catch$model
-ARIMA_lake_catch$model
+Selected ARIMA structure for each model:
 
-
+```{r print-structure}
+tibble(
+  model_name      = c(ARIMA_lake$model_name, ARIMA_catch$model_name, ARIMA_lake_catch$model_name),
+  model_structure = c(ARIMA_lake$model_structure, ARIMA_catch$model_structure, ARIMA_lake_catch$model_structure)
+)
 ```
 
 ---

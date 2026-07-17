@@ -245,6 +245,19 @@ XGB_catch$importance_plot
 XGB_lake_catch$importance_plot
 ```
 
+### Tuned hyperparameters
+
+Best hyperparameter combination selected via cross-validated random search for each
+model (mirrors the ARIMA order / NNAR(p,k) structure reporting for the other models).
+
+```{r print-hyperparams}
+bind_rows(
+  XGB_lake$best_params       |> mutate(model_name = XGB_lake$model_name, .before = 1),
+  XGB_catch$best_params      |> mutate(model_name = XGB_catch$model_name, .before = 1),
+  XGB_lake_catch$best_params |> mutate(model_name = XGB_lake_catch$model_name, .before = 1)
+)
+```
+
 ---
 
 ## 30-Day Forecast Function

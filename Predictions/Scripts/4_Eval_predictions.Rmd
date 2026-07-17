@@ -218,6 +218,24 @@ metrics_eval_all |>
 ```
 
 
+Identify best model across horizon by RMSE
+
+```{r}
+Pred_eval_df |> 
+  #remove NAs and calc RMSE
+  filter(!is.na(fDOM_1m_predicted), !is.na(fDOM_1m_obs)) |> 
+  filter(model_id != "Persistence") |> 
+  group_by(model_id, model_class, model_vars) |> #not grouping by horizon
+  summarise(RMSE = Metrics::rmse(fDOM_1m_obs, fDOM_1m_predicted),
+            .groups = "drop") |> 
+  mutate(RMSE = round(RMSE, 1)) |> 
+  select(-model_id) |> 
+  pivot_wider(names_from = model_class, values_from = RMSE)
+
+```
+
+
+
 RMSE, MAE, and R2 for SI
 
 ```{r}
@@ -325,34 +343,38 @@ based on USGS tinker gauge
 get tinker data and join
 
 ```{r}
-##USGS data
-USGS_daily <- dataRetrieval::readNWISdv(
-  siteNumbers = "02055100",
-  parameterCd = "00060",          # discharge in cfs
-  startDate = "2023-01-01",
-  endDate   = "2026-04-01"
-) |>  dataRetrieval::renameNWISColumns()
+# ##USGS data
+# USGS_daily <- dataRetrieval::readNWISdv(
+#   siteNumbers = "02055100",
+#   parameterCd = "00060",          # discharge in cfs
+#   startDate = "2023-01-01",
+#   endDate   = "2026-04-01"
+# ) |>  dataRetrieval::renameNWISColumns()
+# 
+# #set up flow percentile
+# flow_percentiles <- USGS_daily |>
+#   filter(Date >= ymd("2024-01-01"), Date <= ymd("2026-01-31")) |>
+#   filter(!is.na(Flow)) |>
+#   mutate(flow_percentile = percent_rank(Flow) * 100)
+# 
+# # flag top and bottom 10th percentile dates
+# flow_flags <- flow_percentiles |>
+#   mutate(
+#     decile     = ntile(Flow, 10),
+#     flow_class = case_when(
+#       decile == 1  ~ "Low flow",
+#       decile == 10 ~ "High flow",
+#       TRUE         ~ "Normal"
+#     )
+#   ) |>
+#   select(Date, Flow, flow_percentile, decile, flow_class)
+# 
+# flow_flag_check <- flow_flags |> 
+#   filter(flow_class != "Normal")
 
-#set up flow percentile
-flow_percentiles <- USGS_daily |>
-  filter(Date >= ymd("2024-01-01"), Date <= ymd("2026-01-31")) |>
-  filter(!is.na(Flow)) |>
-  mutate(flow_percentile = percent_rank(Flow) * 100)
+flow_flags <- read_csv("../Data/HPB_USGS_Flows.csv") |> 
+   select(Date, flow_class = flow_class_hpb) 
 
-# flag top and bottom 10th percentile dates
-flow_flags <- flow_percentiles |>
-  mutate(
-    decile     = ntile(Flow, 10),
-    flow_class = case_when(
-      decile == 1  ~ "Low flow",
-      decile == 10 ~ "High flow",
-      TRUE         ~ "Normal"
-    )
-  ) |>
-  select(Date, Flow, flow_percentile, decile, flow_class)
-
-flow_flag_check <- flow_flags |> 
-  filter(flow_class != "Normal")
 
 ## Join to pred eval and plot
 DryWet2 <- Pred_eval_df |>
@@ -513,8 +535,8 @@ highvar_skill
 highvar_rmse / highvar_skill
 
 ##plotly figures
-plotly::ggplotly(highvar_rmse)
-plotly::ggplotly(highvar_skill)
+# plotly::ggplotly(highvar_rmse)
+# plotly::ggplotly(highvar_skill)
 
 ```
 
@@ -567,86 +589,6 @@ ggpubr::annotate_figure(rmse_group_fig,
 )
 
 ```
-
-
-
-## Fig 3; fDOM and metric TS
-
-
-```{r}
-##fdom stats
-eval2_fdom_stats <- eval2 |> 
-  filter(Date <= ymd("2026-01-31"))
-
-mean(eval2_fdom_stats$fDOM_1m_obs, na.rm = T)
-summary(eval2_fdom_stats$fDOM_1m_obs)
-
-(sd(eval2_fdom_stats$fDOM_1m_obs, na.rm = T) / mean(eval2_fdom_stats$fDOM_1m_obs, na.rm = T))*100
-
-
-
-
-#   model_vars_colors <- c("lake" = "#56B4E9", "catchment" = "#009E73", "lake_catchment" = "#CC79A7", "Persistence" = "black")
-# 
-# c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
-
-##fDOM TS
-highvar_colors <- c("High_Var" = "red", "Low_Var" = "black")
-
-fdomTS <- eval2 |> 
-  filter(Date <= ymd("2026-01-31")) |> 
-  ggplot(aes(x = Date, y = fDOM_1m_obs))+
-  #ggplot(aes(x = Date, y = fDOM_1m_obs, col = HighVar))+
-  geom_point()+
-  labs(x = "Date", y = "fDOM (QSU)")+
-  #scale_color_manual(values = highvar_colors)+
-  geom_vline(xintercept = ymd("2024-03-01"), linetype = 2, linewidth = 1.2, color = "red")+
-  theme_bw() + theme(legend.position = "none", text = element_text(size = 18))
-
-
-## Flow TS
-Flow_colors <- c("Low flow" = "#D55E00", "High flow" = "#0072B2", "Normal" = "black")
-  
-flowTS <- flow_flags |> 
-  ggplot(aes(x = Date, y = Flow, col = flow_class))+
-  geom_point()+
-   labs(x = "Date", y = "USGS Flow (L/s)")+
-  scale_color_manual(values = Flow_colors)+
-  scale_x_date(date_labels = "%b %y", date_breaks = "6 months")+
-  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
-
-
-## Density 
-dens_colors <- c("Mixed" = "red", "Strat" = "black")
-
-stratTS <- strat |> 
-  filter(!is.na(Strat)) |> 
-  ggplot(aes(x = Date, y = Diff_Dens_1_max, col = Strat))+
-  geom_point()+
-  labs(x = "Date", y = "Density Difference (kg/m^3)", color = "Stratified")+
-  scale_color_manual(values = dens_colors)+
-  #scale_x_date(date_labels = "%b %Y", date_breaks = "6 months")+
-  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
-
-
-
-##Join
-
-fdomTS / (flowTS | stratTS) +  
-  plot_annotation(tag_levels = c('a', 'b', 'c') )
-
-
-
-```
-
-
-
-
-
-
-
-
-
 
 
 

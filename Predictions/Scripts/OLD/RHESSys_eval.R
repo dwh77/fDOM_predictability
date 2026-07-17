@@ -6,15 +6,15 @@ library(patchwork)
 
 
 #### Read in RHESSys outputs ----
- workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys/out/ccr_patch1500_KEEP"
-# workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys/out/ccr_patch1500_cow1"
+# workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys/out/ccr_patch1500_KEEP"
+ # workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys/out/ccr_patch1500_cow1"
  workpath <-
- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/DWH_ch4_rhessys/out/ccr1500_run1"
+ "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/DWH_ch4_rhessys/out"
 
 
 
 #### Check spinup
-spin_grow <- read_delim(paste0(workpath, "/spinup_run_3500_grow_basin.daily"),
+spin_grow <- read_delim(paste0(workpath, "/ccrSPIN/spinup_run_1000_grow_basin.daily"),
                         delim = " ", col_names = T) |>
   mutate(Date = ymd(paste(year, month, day, sep = "-")))
 
@@ -25,23 +25,89 @@ spin_grow |>
   ggplot(aes(x = Date, y = value))+
   geom_point()+ facet_wrap(~name, scales = "free_y", nrow = 1)
 
-#plot(spin_grow$Date, spin_grow$lai)
+plot(spin_grow$Date, spin_grow$lai)
 
+############################## function to read in outputs
+load_rhessys_output <- function(grow_path,
+                                h2o_path,
+                                area_m2     = 45.83578 * 1000000,
+                                filter_date = "2021-01-01") {
+
+  output_grow <- read_delim(grow_path, delim = " ", col_names = TRUE)
+  output_h2o  <- read_delim(h2o_path,  delim = " ", col_names = TRUE)
+
+  left_join(output_h2o, output_grow, by = c("day", "month", "year", "basinID")) |>
+    mutate(date = ymd(paste(year, month, day, sep = "-"))) |>
+    filter(date >= ymd(filter_date)) |>
+    select(date, streamflow, return, baseflow, streamflow_NO3, streamflow_NH4, streamflow_DOC, lai.y) |>
+    rename(lai = lai.y) |>
+    mutate(
+      streamflow_m_day  = streamflow / 1000,
+      streamflow_m3_day = streamflow_m_day * area_m2,
+      DOC_mgL           = streamflow_DOC / streamflow_m_day,
+      NO3_mgL           = streamflow_NO3 / streamflow_m_day,
+      NH4_mgL           = streamflow_NH4 / streamflow_m_day
+    ) |>
+    select(date, lai, streamflow_m3_day, DOC_mgL, NO3_mgL)
+}
+
+# Usage
+# output_h2o_grow <- load_rhessys_output(
+#   grow_path   = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_grow_basin.daily"),
+#   h2o_path    = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_basin.daily"),
+#   area_m2     = 45.83578 * 1000000,   # optional, this is the default
+#   filter_date = "2021-01-01"           # optional, this is the default
+# )
+
+
+#### Harvest scenarios
+harvest_1930 <- load_rhessys_output(
+  grow_path   = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_grow_basin.daily"),
+  h2o_path    = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_basin.daily")) |>
+  mutate(Scenario = "Harvest 1930")
+
+
+harvest_1946 <- load_rhessys_output(
+  grow_path   = paste0(workpath, "/ccrTR/TR1850_2026_harvest1946_run_grow_basin.daily"),
+  h2o_path    = paste0(workpath, "/ccrTR/TR1850_2026_harvest1946_run_basin.daily")) |>
+  mutate(Scenario = "Harvest 1946")
+
+
+harvest_none <- load_rhessys_output(
+  grow_path   = paste0(workpath, "/ccrTR/TR1850_2026_NOharvest_run_grow_basin.daily"),
+  h2o_path    = paste0(workpath, "/ccrTR/TR1850_2026_NOharvest_run_basin.daily")) |>
+  mutate(Scenario = "No Harvest")
+
+
+
+### Plot harvest scenarios
+rbind(harvest_1930, harvest_1946, harvest_none) |>
+  #filter(Scenario != "No Harvest") |>
+  select(date, Scenario, lai, streamflow_m3_day, DOC_mgL, NO3_mgL) |>
+  pivot_longer(-c(1:2)) |>
+  ggplot(aes(x = date, y = value, color = Scenario))+
+  geom_line()+ facet_wrap(~name, scales = "free_y")+
+  theme_bw()+ theme(legend.position = "top")
 
 
 
 ################################################################################
 #### Basin level ----
-output_grow <- read_delim(paste0(workpath, "/harvest1850_2026run_grow_basin.daily"),
+output_grow <- read_delim(paste0(workpath, "/ccrTR/TR1850_2026_NOharvest_run_grow_basin.daily"),
                           delim = " ", col_names = T)
+
 
 #look at C stocks
 output_grow |>
   mutate(Date = ymd(paste(year, month, day, sep = "-"))) |>
-  select(Date, lai, plantc, soilc) |>
-  pivot_longer(-1) |>
-  ggplot(aes(x = Date, y = value))+
-  geom_point()+ facet_wrap(~name, scales = "free_y", nrow = 1)
+  ggplot(aes(x = Date, y = lai))+  geom_point()
+
+# output_grow |>
+#   mutate(Date = ymd(paste(year, month, day, sep = "-"))) |>
+#   select(Date, lai, plantc, soilc) |>
+#   pivot_longer(-1) |>
+#   ggplot(aes(x = Date, y = value))+
+#   geom_point()+ facet_wrap(~name, scales = "free_y", nrow = 1)
 
 
 output_h2o <- read_delim(paste0(workpath, "/harvest1850_2026run_basin.daily"),
@@ -138,7 +204,6 @@ flow_comparison |>
 
 ggplot(flow_comparison, aes(x = date, y = pct_of_CCR)) +
   geom_line() +
-  geom_hline(yintercept = 100, linetype = "dashed", color = "red") +
   labs(x = "Date", y = "Tributaries as % of CCR dam Q",
        title = "SMB + HPB + CCS vs CCR dam discharge") +
   theme_bw()
@@ -157,6 +222,8 @@ target <- read_csv("C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_developme
 #   rename(lai = lai_MODIS,
 #          Q_m3_day = HPB_Q_lm_m3day )
 
+getwd()
+targetQ_hpb <- read_csv("./Predictions/Data/HPB_USGS_Flows.csv")
 
 
 
@@ -184,11 +251,16 @@ lai_SI
 
 ################################################################################
 #### HPB Q evals ----
-hpb_PT_eval <- target |>
-  mutate(date = as.Date(Date)) |>
-  filter(date >= ymd("2021-01-01"),
-         Site == 100) |>
-  select(date, HPB_Q_PT_m3day, HPB_Q_lm_m3day)
+# hpb_PT_eval <- target |>
+#   mutate(date = as.Date(Date)) |>
+#   filter(date >= ymd("2021-01-01"),
+#          Site == 100) |>
+#   select(date, HPB_Q_PT_m3day, HPB_Q_lm_m3day)
+
+hpb_PT_eval <- targetQ_hpb |>
+  mutate(HPB_Q_PT_m3day = HPB_Q_cms *86400,
+         HPB_Q_lm_m3day = (HPBinterp_Q_Ls /1000) * 86400) |>
+  select(date = Date, HPB_Q_PT_m3day, HPB_Q_lm_m3day )
 
 
 ### HPB PT discharge
@@ -390,4 +462,5 @@ metrics_by_site <- stats_df |>
 
 metrics_overall
 metrics_by_site
+
 

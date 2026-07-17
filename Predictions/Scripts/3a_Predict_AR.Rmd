@@ -115,16 +115,16 @@ fit_ar_glm <- function(all_data,
 
 All models trained on data before `r train_cutoff`.
 
-```{r fit-models, results='hide'}
+```{r fit-models}
 # M1: lag only
-AR_lagonly <- fit_ar_glm(
-  all_data     = ar_df,
-  train_cutoff = train_cutoff,
-  target       = "fDOM_1_QSU_daily",
-  lag_col      = "fDOM_1m_lag1",
-  covariates   = NULL,
-  model_name   = "AR_lag_only"
-)
+# AR_lagonly <- fit_ar_glm(
+#   all_data     = ar_df,
+#   train_cutoff = train_cutoff,
+#   target       = "fDOM_1_QSU_daily",
+#   lag_col      = "fDOM_1m_lag1",
+#   covariates   = NULL,
+#   model_name   = "AR_lag_only"
+# )
 
 # M2: lag + in-lake (Temp, DO, Chla)
 AR_lake <- fit_ar_glm(
@@ -163,7 +163,6 @@ AR_lake_catch <- fit_ar_glm(
 ### Training plots
 
 ```{r plot-training, fig.height=4}
-AR_lagonly$plot
 AR_lake$plot
 AR_catch$plot
 AR_lake_catch$plot
@@ -173,7 +172,7 @@ AIC
 
 ```{r}
 
-AIC(AR_lagonly$model, AR_lake$model, AR_catch$model,  AR_lake_catch$model)
+AIC(AR_lake$model, AR_catch$model,  AR_lake_catch$model)
 
 ```
 
