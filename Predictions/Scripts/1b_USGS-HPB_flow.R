@@ -1,3 +1,8 @@
+## Script to gap fill missing HPB flow with data from USGS
+# also calculate flow percentiles for period of prediction generation
+
+
+
 library(dataRetrieval)
 library(ggpmisc)
 
@@ -54,9 +59,7 @@ HPB_daily |> ggplot(aes(x= Date, y = Daily_Q_cms))+geom_point()
 
 #join to USGS
 USGS_HPB_Q <- full_join(USGS_daily, HPB_daily, by = "Date") |>
-  rename(USGS_Q_cms = Flow_cms,  HPB_Q_cms = Daily_Q_cms) |>
-  mutate(USGS_Q_Ls = USGS_Q_cms * 1000,
-         HPB_Q_Ls = HPB_Q_cms * 1000)
+  rename(USGS_Q_cms = Flow_cms,  HPB_Q_cms = Daily_Q_cms)
 
 
 #### HPB regress to USGS ----
@@ -64,56 +67,30 @@ USGS_HPB_Q <- full_join(USGS_daily, HPB_daily, by = "Date") |>
 USGS_HPB_Q |>
   # filter(HPB_Q_cms < 500,
   #        USGS_Q_cms < 5000) |>
-  ggplot(aes(x = USGS_Q_Ls, y = HPB_Q_Ls)) +
+  ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms)) +
   geom_point() +
-  #xlim(0,5000)+
+  xlim(0,5)+
   stat_poly_line(method = "lm", linewidth = 2) +
   stat_poly_eq(formula = y ~ x, label.x = "left", label.y = "top", parse = TRUE,
-               inherit.aes = FALSE, aes(x = USGS_Q_Ls, y = HPB_Q_Ls,
+               inherit.aes = FALSE, aes(x = USGS_Q_cms, y = HPB_Q_cms,
                                         label = paste(..adj.rr.label.., ..p.value.label.., sep = "~~~"), size = 3)  ) +
   labs(x = "USGS Flow (cms)", y = "HPB Q (cms)") +
   theme_bw()
 
 
-#use equation from Ch3
-#FlowS1 = 0.08*FlowUSGS – 4.39
-
-USGS_HPB_Q <- USGS_HPB_Q |>
-  mutate(HPBinterp_Q_Ls = (0.08*USGS_Q_Ls) - 4.39) |>
-  mutate(HPB_Q_Ls_filled = ifelse(is.na(HPB_Q_Ls), HPBinterp_Q_Ls, HPB_Q_Ls))
-
-#Regression
-USGS_HPB_Q |>
-  # filter(HPBinterp_Q_Ls < 500, HPB_Q_Ls < 500) |>
-  ggplot(aes(x = HPBinterp_Q_Ls, y = HPB_Q_Ls)) +
-  geom_point() +
-  xlim(0,300)+
-  stat_poly_line(method = "lm", linewidth = 2) +
-  stat_poly_eq(formula = y ~ x, label.x = "left", label.y = "top", parse = TRUE,
-               inherit.aes = FALSE, aes(x = HPBinterp_Q_Ls, y = HPB_Q_Ls,
-                                        label = paste(..adj.rr.label.., ..p.value.label.., sep = "~~~"), size = 3)  ) +
-  labs(x = "Interpolated HPB Q (cms)", y = "Observed HPB Q (cms)") +
-  theme_bw()
-
-
-#timeseries
-USGS_HPB_Q |>
-  filter(Date > ymd("2024-04-15")) |>
-  select(Date, HPB_Q_Ls, HPBinterp_Q_Ls) |>
-  pivot_longer(-1) |>
-  ggplot(aes(x= Date, y = value, color = name))+
-  geom_point()+
-  theme_bw()+ theme(legend.position = "top")
-
-
-
-## Figure for SI
-#fit lm and make equation
+## fit regression
 Qcms_lm <- lm(HPB_Q_cms ~ USGS_Q_cms, data = USGS_HPB_Q)
 summary(Qcms_lm)
-coef(Qcms_lm)[1]
+intercept <- coef(Qcms_lm)[1]
+slope <- coef(Qcms_lm)[2]
 
 lm_label <- paste0("y = ", round(coef(Qcms_lm)[2], 3), "x ", round(coef(Qcms_lm)[1], 3))
+
+#calc interp and fill missing
+USGS_HPB_Q <- USGS_HPB_Q |>
+  mutate(HPBinterp_Q_cms = (slope*USGS_Q_cms) + intercept
+    ) |>
+  mutate(HPB_Q_cms_filled = ifelse(is.na(HPB_Q_cms), HPBinterp_Q_cms, HPB_Q_cms))
 
 
 ## get pearson r
@@ -126,19 +103,36 @@ correlation
 
 cor_label <- paste0("Pearson's r = ", round(correlation, 2))
 
-
+#Plot
 USGS_HPB_Q |>
   ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms))+
   geom_point()+
   geom_abline(intercept = coef(Qcms_lm)[1], slope = coef(Qcms_lm)[2],
-              linewidth = 1)+
+              linewidth = 0.75, color = "red")+
   theme_bw()+
-  xlim(0,5)+
+  xlim(0,4)+
   labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)")+
   annotate("text", x = 1.5, y = 0.65, label = lm_label,
            hjust = 1.1, vjust = -0.5, size = 3.5)+
   annotate("text", x = 1.5, y = 0.75, label = cor_label,
            hjust = 1.1, vjust = -0.5, size = 3.5)
+
+
+##save figure
+# ggsave("./Predictions/Figures/HPB_USGS_SIfig.png", height = 3.5, width = 4.5, units = "in")
+
+
+#timeseries
+USGS_HPB_Q |>
+  filter(Date > ymd("2024-04-15")) |>
+  select(Date, HPB_Q_cms, HPBinterp_Q_cms) |>
+  pivot_longer(-1) |>
+  ggplot(aes(x= Date, y = value, color = name))+
+  geom_point()+
+  theme_bw()+ theme(legend.position = "top")
+
+
+
 
 
 
@@ -159,11 +153,11 @@ flow_flags <- USGS_HPB_Q |>
   filter(Date >= ymd("2024-01-01"), Date <= ymd("2026-01-31")) |>
   mutate(
     #USGS
-    decile_usgs     = ntile(USGS_Q_Ls , 10),
+    decile_usgs     = ntile(USGS_Q_cms , 10),
     flow_class_usgs = case_when(decile_usgs == 1  ~ "Low flow",  decile_usgs == 10 ~ "High flow",
       TRUE         ~ "Normal"),
     #HPB filled
-    decile_hpb     = ntile(HPB_Q_Ls_filled , 10),
+    decile_hpb     = ntile(HPB_Q_cms_filled , 10),
     flow_class_hpb = case_when(decile_hpb == 1  ~ "Low flow",  decile_hpb == 10 ~ "High flow",
                                 TRUE         ~ "Normal"),
   ) |>

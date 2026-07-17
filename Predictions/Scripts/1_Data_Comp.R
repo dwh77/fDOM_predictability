@@ -8,7 +8,7 @@ library(slider) # for rolling windows 'slide_dbl'
 
 
 #### Daily Met ----
-options(timeout = 300)  # 5 minutes
+options(timeout = 600)  # 10 minutes
 met <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1105/4/8ebf27393ccafe518328468a260d2e18")
 range(met$DateTime)
 
@@ -27,7 +27,6 @@ daily_met <- plyr::rbind.fill(met, met_githubL1) |>
 
 
 #### EDI data sets ----
-options(timeout = 600)  # 10 minutes
 catwalk_EDI <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1069/4/42e6d8bb3d379d40a4a4fb566d4ff36e" )
 summary(ymd_hms(catwalk_EDI$DateTime))
 
@@ -66,9 +65,11 @@ catwalk_daily <- catwalk |>
     # Chlorophyll-a
     Chla_1_ugL_daily     = mean(EXOChla_ugL_1,         na.rm = TRUE),
     # DO % saturation
-    DOsat_1_pct_daily    = mean(EXODOsat_percent_1,    na.rm = TRUE)
+    DOsat_1_pct_daily    = mean(EXODOsat_percent_1,    na.rm = TRUE),
     # # Specific conductance
-    # SC_1_uScm_daily  = mean(EXOSpCond_uScm_1,      na.rm = TRUE)
+    SC_1_uScm_daily  = mean(EXOSpCond_uScm_1,      na.rm = TRUE),
+    #water level
+    waterlevel_m = mean(Modeled_Depth_m, na.rm = TRUE)
   )
 
 
@@ -131,39 +132,39 @@ density_join |>
   facet_wrap(~name, scales = "free_y", ncol = 1)+ theme_bw()
 
 
-### make heatmap of temp profiles
-library(akima)  # for interpolation
-
-# Step 1: interpolate to 0.1m depth intervals for each date
-interp_df <- depths_daily |>
-  filter(!is.na(Temp_C), !is.na(sensor_depth_m)) |>
-  group_by(Date) |>
-  reframe({
-    if (n() >= 3) {
-      interp_result <- approx(
-        x    = sensor_depth_m,
-        y    = Temp_C,
-        xout = seq(0, max(sensor_depth_m), by = 0.1)  # start at 0
-      )
-      tibble(depth_interp = round(interp_result$x, 1),  # round to 1 decimal
-             Temp_interp  = interp_result$y)
-    } else {
-      tibble(depth_interp = round(sensor_depth_m, 1), Temp_interp = Temp_C)
-    }
-  }) |>
-  filter(!is.na(Temp_interp))  # drop NAs outside observed range
-
-# Step 2: heatmap
-ggplot(interp_df, aes(x = Date, y = depth_interp, fill = Temp_interp)) +
-  geom_tile() +
-  scale_y_reverse() +                          # surface at top
-  scale_fill_gradientn(
-    colors = c("blue", "cyan", "yellow", "red"),
-    name   = "Temp (°C)"
-  ) +
-  labs(x = "Date", y = "Depth (m)", title = "Water Temperature Heatmap") +
-  theme_bw() +
-  theme(text = element_text(size = 14))
+# ### make heatmap of temp profiles
+# library(akima)  # for interpolation
+#
+# # Step 1: interpolate to 0.1m depth intervals for each date
+# interp_df <- depths_daily |>
+#   filter(!is.na(Temp_C), !is.na(sensor_depth_m)) |>
+#   group_by(Date) |>
+#   reframe({
+#     if (n() >= 3) {
+#       interp_result <- approx(
+#         x    = sensor_depth_m,
+#         y    = Temp_C,
+#         xout = seq(0, max(sensor_depth_m), by = 0.1)  # start at 0
+#       )
+#       tibble(depth_interp = round(interp_result$x, 1),  # round to 1 decimal
+#              Temp_interp  = interp_result$y)
+#     } else {
+#       tibble(depth_interp = round(sensor_depth_m, 1), Temp_interp = Temp_C)
+#     }
+#   }) |>
+#   filter(!is.na(Temp_interp))  # drop NAs outside observed range
+#
+# # Step 2: heatmap
+# ggplot(interp_df, aes(x = Date, y = depth_interp, fill = Temp_interp)) +
+#   geom_tile() +
+#   scale_y_reverse() +                          # surface at top
+#   scale_fill_gradientn(
+#     colors = c("blue", "cyan", "yellow", "red"),
+#     name   = "Temp (°C)"
+#   ) +
+#   labs(x = "Date", y = "Depth (m)", title = "Water Temperature Heatmap") +
+#   theme_bw() +
+#   theme(text = element_text(size = 14))
 
 
 
@@ -174,18 +175,18 @@ Catwalk_df <- full_join(catwalk_daily, density_join,  by = "Date")
 
 #### Get RHESSys data and format to bind ----
 ##read in RHESSys
-workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys/out/ccr_patch1500_cow1"  #ccr_patch1500_KEEP
+workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys_dwh/out"  #ccr_rhessys/out/ccr_patch1500_cow1; ccr_patch1500_KEEP
 
-output_grow <- read_delim(paste0(workpath, "/harvest1850_2026run_grow_basin.daily"),
+output_grow <- read_delim(paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_grow_basin.daily"),
                           delim = " ", col_names = T)
 
-output_h2o <- read_delim(paste0(workpath, "/harvest1850_2026run_basin.daily"),
+output_h2o <- read_delim(paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_basin.daily"),
                          delim = " ", col_names = T)
 
-# HPB area is 4.299446 km^2
-# hpb_area_m2 <- 4.299446 * 1000000
-ccr_area_m2 <- 45.83578 * 1000000
 
+
+#define area and format data
+ccr_area_m2 <- 45.83578 * 1000000
 
 output_h2o_grow <- left_join(output_h2o, output_grow, by = c("day", "month", "year", "basinID")) |>
   mutate(date = ymd(paste(year, month, day, sep = "-"))) |>
@@ -200,16 +201,17 @@ output_h2o_grow <- left_join(output_h2o, output_grow, by = c("day", "month", "ye
          NO3_mgL = streamflow_NO3 / streamflow_m_day)
 
 
+#format data for join
 rhessys_df <- output_h2o_grow |>
   rename(Date = date) |>
-  select(Date, streamflow_m3_day, DOC_mgL) |> #streamflow_DOC
-  rename(#RH_streamflow_DOC_gm2day = streamflow_DOC,
-         RH_Q_m3day = streamflow_m3_day,
+  mutate(streamflow_cms = streamflow_m3_day / 86400) |>
+  select(Date, streamflow_cms, DOC_mgL) |>
+  rename(RH_Q_cms = streamflow_cms,
          RH_DOC_mgL = DOC_mgL)
 
 
 
-#### Z score and export
+#### format and export
 datecheck <- seq(ymd("2021-08-19"), ymd("2026-02-01"), by = "day")
 
 Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
@@ -221,8 +223,8 @@ Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
   mutate(
     Chla_1_ugL_7day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 7, .after = 0, .complete = F),
     Chla_1_ugL_14day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 14, .after = 0, .complete = F),
-    RH_Q_m3day_7day = slider::slide_dbl(RH_Q_m3day, mean, .before = 7, .after = 0, .complete = F),
-    RH_Q_m3day_14day = slider::slide_dbl(RH_Q_m3day, mean, .before = 14, .after = 0, .complete = F),
+    RH_Q_cms_7day = slider::slide_dbl(RH_Q_cms, mean, .before = 7, .after = 0, .complete = F),
+    RH_Q_cms_14day = slider::slide_dbl(RH_Q_cms, mean, .before = 14, .after = 0, .complete = F),
   )
   # # Z-score
   # mutate(across(
@@ -245,8 +247,8 @@ library(corrplot)
 
 df_corr1m <- Catwalk_RH_df |>
   #select(-Date, fDOM_1m_lag1)
-  select(-c(Date, fDOM_1m_lag1, Chla_1_ugL_7day, Chla_1_ugL_14day, RH_Q_m3day_7day, RH_Q_m3day_14day,
-            Temp_1_C_daily, Diff_C_1_max))
+  select(-c(Date, fDOM_1m_lag1, Chla_1_ugL_7day, Chla_1_ugL_14day, RH_Q_cms_7day, RH_Q_cms_14day,
+            Temp_1_C_daily, Diff_C_1_max, Rain_mm_daily, SW_Wm2_daily))
 
 
 cor_matrix <- cor(df_corr1m, use = "pairwise.complete.obs")
@@ -284,122 +286,16 @@ corrplot(bold_matrix,
 export_df <- Catwalk_RH_df |>
   dplyr::select(Date, fDOM_1_QSU_daily, fDOM_1m_lag1,
                 Diff_Dens_1_max, DOsat_1_pct_daily, Chla_1_ugL_daily,
-                RH_Q_m3day, RH_DOC_mgL)
+                RH_Q_cms, RH_DOC_mgL)
 
 
 summary(export_df)
 
 
+getwd()
 #write.csv(export_df, "./Predictions/Data/Daily_catwalk_RH_2021_2026.csv", row.names = F)
 # # also write df with all variables just to have daily data compiled
 # write.csv(Catwalk_RH_df, "./Predictions/Data/Extras_Daily_Cat_Met_RH_2021_2026.csv", row.names = F)
-
-
-##monthly hydro
-# export_df |>
-#   mutate(year = year(Date),
-#          month_year = floor_date(Date, "month")) |>
-#   filter(year > 2023) |>
-#   ggplot(aes(x = factor(month_year), y = (RH_Q_m3day/86400))) +
-#   geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.size = 1) +
-#   geom_jitter(width = 0.2, size = 1.2, alpha = 0.5, color = "gray30") +
-#   scale_x_discrete(labels = function(x) format(as.Date(x), "%b %Y")) +
-#   labs(x = NULL, y = "RH Discharge (m³/sec)") +
-#   theme_bw() +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-#         text = element_text(size = 13))
-
-
-
-
-#### Stats and plots for paper ----
-getwd()
-eval <- read_csv("./Predictions/Data/Daily_catwalk_RH_2021_2026.csv") |>
-  mutate(Date = as.Date(Date)) |> filter(Date <= ymd("2026-01-31")) |>
-  mutate(Train = ifelse(Date < ymd("2024-01-01"), "Train", "Pred"))
-
-
-##fdom stats full TS
-mean(eval$fDOM_1_QSU_daily , na.rm = T)
-summary(eval$fDOM_1_QSU_daily)
-
-(sd(eval$fDOM_1_QSU_daily, na.rm = T) / mean(eval$fDOM_1_QSU_daily, na.rm = T))*100
-
-##stats for full TS
-obs_stats_fullTS <- eval |> select(-fDOM_1m_lag1) |>
-  pivot_longer(cols = -c(Date, Train),
-               names_to = "Variable",
-               values_to = "Value") |>
-  group_by(Variable) |>
-  summarise(
-    Min   = min(Value,   na.rm = TRUE),
-    Mean   = mean(Value,   na.rm = TRUE),
-    Median = median(Value, na.rm = TRUE),
-    Max   = max(Value,   na.rm = TRUE),
-    SD     = sd(Value,     na.rm = TRUE),
-    CV     = (SD / Mean) * 100,
-    .groups = "drop"
-  ) |>
-  arrange(Variable) |>
-  mutate(across(where(is.numeric), ~ round(., 1)))
-
-
-##stats for training vs prediction
-obs_stats_TrainPred <- eval |> select(-fDOM_1m_lag1) |>
-  pivot_longer(cols = -c(Date, Train),
-               names_to = "Variable",
-               values_to = "Value") |>
-  group_by(Train, Variable) |>
-  summarise(
-    Min   = min(Value,   na.rm = TRUE),
-    Mean   = mean(Value,   na.rm = TRUE),
-    Median = median(Value, na.rm = TRUE),
-    Max   = max(Value,   na.rm = TRUE),
-    SD     = sd(Value,     na.rm = TRUE),
-    CV     = (SD / Mean) * 100,
-    .groups = "drop"
-  ) |>
-  arrange(Variable)|>
-  mutate(across(where(is.numeric), ~ round(., 1)))
-
-
-## plotlys
-#strat
-densts <- eval |> select(Date, Diff_Dens_1_max) |> mutate(Diff_Dens_1_max = round(Diff_Dens_1_max, 2))
-
-strat_plot <- eval |> ggplot(aes(x = Date, y = Diff_Dens_1_max))+ geom_point()
-plotly::ggplotly(strat_plot)
-
-#chla
-chla_plot <- eval |> ggplot(aes(x = Date, y = Chla_1_ugL_daily))+ geom_point()
-plotly::ggplotly(chla_plot)
-
-#DO
-DO_plot <- eval |> ggplot(aes(x = Date, y = DOsat_1_pct_daily))+ geom_point()
-plotly::ggplotly(DO_plot)
-
-##make plots
-driverplot <- eval |>
-  select(-fDOM_1m_lag1, - Train) |>
-  mutate(RH_Q_cms = RH_Q_m3day / 86400) |> select(-RH_Q_m3day) |>
-  # filter(Date > ymd("2024-04-01")) |>
-  filter(Date > ymd("2021-08-19"), Date < ymd("2026-01-31")) |>
-  pivot_longer(-1) |>
-  ggplot(aes(x = Date, y = value))+
-  geom_point()+ facet_wrap(~name, scales = "free_y")+
-  geom_vline(xintercept = ymd("2024-01-01"), linetype = 2, linewidth = 1.2, color = "red")+
-  theme_bw()
-
-driverplot
-plotly::ggplotly(driverplot)
-
-driverdf |>
-  # filter(Date > ymd("2024-04-01")) |>
-  filter(Date > ymd("2021-08-19"), Date < ymd("2026-01-31")) |>
-  ggplot(aes(x = Date, y = fDOM_1_QSU_daily))+
-  geom_point()+ labs(x = "Date", y = "fDOM (QSU)")+
-  geom_vline(xintercept = ymd("2024-03-01"), linetype = 2, linewidth = 1.2, color = "red")+
-  theme_bw()
 
 
 
