@@ -9,18 +9,6 @@ output:
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo    = TRUE,
-  message = T,
-  warning = T,
-  fig.width  = 10,
-  fig.height = 5
-)
-```
-
----
-
 ## Packages and Data
 
 Uses `tidymodels` / `parsnip` XGBoost following Melofton et al. Hyperparameters are
@@ -127,7 +115,7 @@ fit_xgb_model <- function(all_data,
       resamples = folds,
       grid      = grid_size,
       control   = control_grid(save_pred = TRUE),
-      metrics   = metric_set(rmse)
+      metrics   = metric_set(yardstick::rmse)
     )
 
   best_params <- select_best(xgb_tune, metric = "rmse")
@@ -213,7 +201,7 @@ XGB_catch <- fit_xgb_model(
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
   lag_col      = "fDOM_1m_lag1",
-  covariates   = c("RH_Q_m3day", "RH_DOC_mgL"),
+  covariates   = c("RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "XGB_lag_catchment"
 )
 
@@ -224,7 +212,7 @@ XGB_lake_catch <- fit_xgb_model(
   target       = "fDOM_1_QSU_daily",
   lag_col      = "fDOM_1m_lag1",
   covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily",
-                   "RH_Q_m3day", "RH_DOC_mgL"),
+                   "RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "XGB_lag_lake_catchment"
 )
 ```
@@ -374,6 +362,8 @@ run_forecasts <- function(model_obj,
 }
 ```
 
+
+
 ```{r run-forecasts}
 forecasts_xgb2 <- run_forecasts(XGB_lake,       ar_df, pred_dates)
 forecasts_xgb3 <- run_forecasts(XGB_catch,      ar_df, pred_dates)
@@ -390,7 +380,7 @@ glimpse(all_XGB_forecasts)
 
 ```{r save}
 write_csv(all_XGB_forecasts,
-          "../Data/XGB_forecasts_2024-2025_27may26.csv")
+          "../Data/XGB_forecasts_2024-2025_21july26_dailyRefit.csv")
 
 
 ```

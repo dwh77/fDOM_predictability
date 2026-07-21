@@ -9,17 +9,6 @@ output:
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo    = TRUE,
-  message = T,
-  warning = T,
-  fig.width  = 10,
-  fig.height = 5
-)
-```
-
----
 
 ## Packages and Data
 
@@ -188,7 +177,7 @@ ARIMA_catch <- fit_arima_model(
   all_data     = ar_df,
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
-  covariates   = c("RH_Q_m3day", "RH_DOC_mgL"),
+  covariates   = c("RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "ARIMA_lag_catchment"
 )
 
@@ -198,7 +187,7 @@ ARIMA_lake_catch <- fit_arima_model(
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
   covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily",
-                   "RH_Q_m3day", "RH_DOC_mgL"),
+                   "RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "ARIMA_lag_lake_catchment"
 )
 ```
@@ -364,6 +353,6 @@ glimpse(all_ARIMA_forecasts)
 
 ```{r save}
 write_csv(all_ARIMA_forecasts,
-          "../Data/ARIMA_forecasts_2024-2025_27may26.csv")
+          "../Data/ARIMA_forecasts_2024-2025_21july26_dailyRefit.csv")
 
 ```

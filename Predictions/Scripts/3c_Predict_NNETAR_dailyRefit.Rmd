@@ -9,17 +9,6 @@ output:
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo    = TRUE,
-  message = T,
-  warning = T,
-  fig.width  = 10,
-  fig.height = 5
-)
-```
-
----
 
 ## Packages and Data
 
@@ -185,7 +174,7 @@ NNETAR_catch <- fit_nnetar_model(
   all_data     = ar_df,
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
-  covariates   = c("RH_Q_m3day", "RH_DOC_mgL"),
+  covariates   = c("RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "NNETAR_lag_catchment"
 )
 
@@ -195,7 +184,7 @@ NNETAR_lake_catch <- fit_nnetar_model(
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
   covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily",
-                   "RH_Q_m3day", "RH_DOC_mgL"),
+                   "RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "NNETAR_lag_lake_catchment"
 )
 
@@ -355,6 +344,6 @@ glimpse(all_NNETAR_forecasts)
 
 ```{r save}
 write_csv(all_NNETAR_forecasts,
-          "../Data/NNETAR_forecasts_2024-2025_27may26.csv")
+          "../Data/NNETAR_forecasts_2024-2025_21july26_dailyRefit.csv")
 
 ```

@@ -9,17 +9,6 @@ output:
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo    = TRUE,
-  message = T,
-  warning = T,
-  fig.width  = 10,
-  fig.height = 5
-)
-```
-
----
 
 ## Packages and Data
 
@@ -56,7 +45,7 @@ ar_df <- ar_df |>
 
 ### Fitting function
 
-Fits a Gaussian GLM on data before `train_cutoff`. Returns the fitted model object,
+Fits model on data before `train_cutoff`. Returns the fitted model object,
 metadata needed for forecasting, and a training plot of observed vs fitted.
 
 ```{r fn-fit}
@@ -142,7 +131,7 @@ AR_catch <- fit_ar_glm(
   train_cutoff = train_cutoff,
   target       = "fDOM_1_QSU_daily",
   lag_col      = "fDOM_1m_lag1",
-  covariates   = c("RH_Q_m3day", "RH_DOC_mgL"),
+  covariates   = c("RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "AR_lag_catchment"
 )
 
@@ -153,7 +142,7 @@ AR_lake_catch <- fit_ar_glm(
   target       = "fDOM_1_QSU_daily",
   lag_col      = "fDOM_1m_lag1",
   covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily",
-                   "RH_Q_m3day", "RH_DOC_mgL"),
+                   "RH_Q_cms", "RH_DOC_mgL"),
   model_name   = "AR_lag_lake_catchment"
 )
 
@@ -327,7 +316,7 @@ glimpse(all_AR_forecasts)
 
 ```{r save}
 write_csv(all_AR_forecasts,
-          "../Data/AR_forecasts_2024-2025_27may26.csv")
+          "../Data/AR_forecasts_2024-2025_21july26_dailyRefit.csv")
 
 ```
 
