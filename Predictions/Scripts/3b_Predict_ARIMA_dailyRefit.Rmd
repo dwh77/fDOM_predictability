@@ -27,9 +27,10 @@ Uses `fable::ARIMA()` with automatic order selection (AIC-based). Univariate mod
 fit a standard ARIMA; covariate models fit regression with ARIMA errors (ARIMAX),
 following Melofton et al.
 
-Forecasting uses `fabletools::refit(..., reestimate = FALSE)` to update the model
-state (residuals, differenced values) to the reference date **without re-estimating
-parameters** — giving the same fit-once structure as the AR, RF, XGB, and NNETAR scripts.
+Forecasting uses `fabletools::refit(..., reestimate = TRUE)` to re-estimate the
+AR/MA/regression coefficients on all history up to the reference date, keeping the
+(p,d,q)(P,D,Q) order fixed from the initial fit — giving the same daily-refit
+structure as the AR, XGB, and NNETAR scripts.
 
 ```{r packages}
 library(tidyverse)
@@ -160,8 +161,8 @@ fit_arima_model <- function(all_data,
 
 ### Fit 4 models
 
-All models trained on data before `r train_cutoff`. ARIMA orders are fixed here
-and reused for all 2024 forecasts via `refit(reestimate = FALSE)`.
+All models trained on data before `r train_cutoff`. ARIMA order is fixed here, but
+coefficients are re-estimated for all 2024-2025 forecasts via `refit(reestimate = TRUE)`.
 
 ```{r fit-models}
 # ARIMA1: univariate (auto-selected order, no external regressors)
@@ -231,9 +232,9 @@ tibble(
 
 ## 30-Day Forecast Function
 
-`refit(..., reestimate = FALSE)` feeds the observed history up to the reference date
-through the fixed ARIMA model to update the internal state (last residuals, differenced
-values). Parameters (AR/MA coefficients, regression coefficients) are unchanged.
+`refit(..., reestimate = TRUE)` feeds the observed history up to the reference date
+through `train_arima()` again, re-estimating the AR/MA/regression coefficients while
+keeping the same (p,d,q)(P,D,Q) order chosen during initial fitting.
 
 `forecast()` then projects 30 days forward. For covariate models, observed covariate
 values for the forecast period are supplied via `new_data` (perfect covariate assumption).
@@ -270,9 +271,10 @@ forecast_fdom_30day <- function(forecast_date,
     arrange(Date) |>
     as_tsibble(index = Date)
 
-  # Update state with fixed parameters (no re-estimation)
+  # Refit: re-estimate AR/MA/regression coefficients on expanding history,
+  # keeping the same (p,d,q)(P,D,Q) order selected during initial fitting
   model_updated <- model_obj$model |>
-    refit(new_data = history_ts, reestimate = FALSE)
+    refit(new_data = history_ts, reestimate = TRUE)
 
   # Forecast dates: day 1 through day 30 after reference date
   forecast_dates <- seq(forecast_date + 1, forecast_date + horizon, by = "day")
