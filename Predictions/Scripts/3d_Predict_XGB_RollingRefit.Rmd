@@ -1,0 +1,428 @@
+---
+title: "XGBoost fDOM Forecasting — Rolling-Window Daily Refit"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: flatly
+date: "`r Sys.Date()`"
+---
+
+## Packages and Data
+
+Like `3d_Predict_XGB_dailyRefit.Rmd`, hyperparameters are tuned once (fixed
+thereafter), and the tree ensemble is refit at every reference date. The difference
+is the training window: instead of an **expanding** window (all history back to the
+start of the record), each refit here uses a **rolling** window of only the
+`window_years` immediately preceding the reference date. `get_train_window()`
+defines that window once, and the same function is used both for the initial tuning
+fit (relative to `train_cutoff`) and for every refit inside the forecast loop
+(relative to each `forecast_date`).
+
+```{r packages}
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+library(vip)
+tidymodels_prefer()
+```
+
+```{r load-data}
+getwd()
+ar_df <- read_csv("../Data/Daily_catwalk_RH_2021_2026.csv")
+
+# Training window: all data before 2024
+train_cutoff <- ymd("2024-01-01")
+
+# Prediction window
+pred_dates <- seq(ymd("2024-01-01"), ymd("2025-12-31"), by = "day")
+```
+
+```{r interpolate-short-gaps}
+# Interpolate short gaps only (≤ 10 consecutive missing days) in target and all drivers.
+# Gaps longer than 10 days are left as NA — those reference dates will be skipped
+ar_df <- ar_df |>
+  mutate(across(-Date,
+                \(x) zoo::na.approx(x, maxgap = 10, na.rm = FALSE, rule = 2)))
+```
+
+```{r fn-window}
+# Rolling training window: only the `window_years` immediately preceding
+# `reference_date`. Used for both the initial tuning/fit (reference_date =
+# train_cutoff) and every daily refit in the forecast loop (reference_date =
+# forecast_date), so the same window logic is applied consistently everywhere
+# training data gets filtered.
+get_train_window <- function(reference_date, window_years = 2) {
+  list(
+    # %m-% (not plain -) so leap-day reference dates roll back to the last
+    # valid day of the target month instead of returning NA (e.g. 2024-02-29
+    # %m-% years(2) -> 2022-02-28, rather than NA because 2022-02-29 doesn't exist)
+    start = reference_date %m-% years(window_years),
+    end   = reference_date
+  )
+}
+
+# Single place to change the rolling window length used everywhere below
+window_years <- 2
+
+```
+
+---
+
+## Model Fitting
+
+### Fitting function
+
+Fits XGBoost following Melofton et al.:
+
+- `mtry = 0.33` (33% of features sampled per split, `counts = FALSE`)
+- `trees = 1000`, `objective = "reg:squarederror"`
+- `min_n`, `tree_depth`, `learn_rate`, `loss_reduction`, `sample_size` tuned via
+  10-fold CV + random search (`grid = 25`) on the rolling window of data ending at
+  `train_cutoff`
+
+Returns the fitted workflow (for training plots / importance), the **finalized but
+unfitted workflow** (`final_wf`) used for refitting at each forecast date, and metadata.
+
+```{r fn-fit}
+fit_xgb_model <- function(all_data,
+                            train_cutoff,
+                            target,
+                            lag_col,
+                            covariates   = NULL,
+                            model_name,
+                            v_folds      = 10,
+                            grid_size    = 25,
+                            window_years = 2,
+                            seed         = 100) {
+
+  set.seed(seed)
+  feature_cols <- c(lag_col, covariates)
+
+  train_window <- get_train_window(train_cutoff, window_years)
+
+  # Build training data — rolling window only, drop NAs in all model columns
+  train_df <- all_data |>
+    filter(Date >= train_window$start, Date < train_window$end) |>
+    select(all_of(c(target, feature_cols))) |>
+    na.omit()
+
+  message(model_name, " | n_train = ", nrow(train_df),
+          " | p = ", length(feature_cols))
+
+  # Cross-validation folds
+  folds <- vfold_cv(train_df, v = v_folds)
+
+  # XGBoost spec — mtry fixed as fraction, other hyperparameters tuned
+  xgb_spec <- boost_tree(
+    mtry          = 0.33,
+    trees         = 1000,
+    min_n         = tune(),
+    tree_depth    = tune(),
+    learn_rate    = tune(),
+    loss_reduction = tune(),
+    sample_size   = tune()
+  ) |>
+    set_engine("xgboost",
+               objective    = "reg:squarederror",
+               eval_metric  = "rmse",
+               counts       = FALSE) |>
+    set_mode("regression")
+
+  # Workflow with recipe
+  xgb_wf <- workflow() |>
+    add_recipe(recipe(as.formula(paste(target, "~ .")), data = train_df)) |>
+    add_model(xgb_spec)
+
+  # Tune hyperparameters
+  message(model_name, " | tuning hyperparameters (", v_folds, "-fold CV, grid = ",
+          grid_size, ")...")
+
+  xgb_tune <- xgb_wf |>
+    tune_grid(
+      resamples = folds,
+      grid      = grid_size,
+      control   = control_grid(save_pred = TRUE),
+      metrics   = metric_set(yardstick::rmse)
+    )
+
+  best_params <- select_best(xgb_tune, metric = "rmse")
+  message(model_name, " | best params selected")
+
+  # Finalize workflow with best hyperparameters
+  final_wf <- xgb_wf |> finalize_workflow(best_params)
+
+  # Fit finalized workflow on the rolling training window
+  xgb_fit <- final_wf |> fit(data = train_df)
+
+  # In-sample fitted values (need Date for plotting — join back)
+  train_df_plot <- all_data |>
+    filter(Date >= train_window$start, Date < train_window$end) |>
+    select(Date, all_of(c(target, feature_cols))) |>
+    na.omit() |>
+    mutate(fitted = predict(xgb_fit, new_data = select(cur_data(), all_of(feature_cols)))$.pred)
+
+  train_rmse <- sqrt(mean((train_df_plot[[target]] - train_df_plot$fitted)^2,
+                           na.rm = TRUE))
+
+  # Training plot
+  p_fit <- ggplot(train_df_plot) +
+    geom_point(aes(x = Date, y = !!sym(target), color = "Observed"),
+               size = 1.2, alpha = 0.8) +
+    geom_point(aes(x = Date, y = fitted, color = "XGB fitted"),
+               size = 1.2, alpha = 0.8) +
+    scale_color_manual(values = c("Observed" = "black", "XGB fitted" = "dodgerblue"),
+                       breaks = c("Observed", "XGB fitted")) +
+    labs(title = paste0(model_name, " — training fit (", window_years, "yr window ending ",
+                        train_window$end, ")",
+                        "  |  RMSE = ", round(train_rmse, 2), " QSU"),
+         x = "Date", y = "fDOM (QSU)", color = NULL) +
+    theme_bw() +
+    theme(legend.position = "top")
+
+  # Variable importance
+  xgb_engine <- extract_fit_engine(xgb_fit)
+  imp_df <- xgboost::xgb.importance(model = xgb_engine,
+                                     feature_names = feature_cols) |>
+    as_tibble() |>
+    rename(Variable = Feature, Importance = Gain) |>
+    arrange(desc(Importance))
+
+  p_imp <- ggplot(imp_df, aes(x = Importance, y = reorder(Variable, Importance))) +
+    geom_col(fill = "#F8766D") +
+    labs(title = paste0(model_name, " — variable importance"),
+         x = "Importance (XGBoost gain)", y = NULL) +
+    theme_bw() +
+    theme(text = element_text(size = 12))
+
+  list(
+    model          = xgb_fit,     # fitted on the rolling window (for plots)
+    final_wf       = final_wf,    # finalized workflow — refit on the rolling window in forecast loop
+    best_params    = best_params,
+    plot           = p_fit,
+    importance_plot = p_imp,
+    model_name     = model_name,
+    target         = target,
+    lag_col        = lag_col,
+    covariates     = covariates,
+    feature_cols   = feature_cols,
+    window_years   = window_years,
+    train_rmse     = train_rmse
+  )
+}
+```
+
+### Fit 3 models
+takes ~5 min to train all 3
+```{r fit-models}
+# XGB2: lag + in-lake (Diff_Dens, DO, Chla)
+XGB_lake <- fit_xgb_model(
+  all_data     = ar_df,
+  train_cutoff = train_cutoff,
+  target       = "fDOM_1_QSU_daily",
+  lag_col      = "fDOM_1m_lag1",
+  covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily"),
+  model_name   = "XGB_lag_lake",
+  window_years = window_years
+)
+
+# XGB3: lag + catchment (RH discharge and DOC)
+XGB_catch <- fit_xgb_model(
+  all_data     = ar_df,
+  train_cutoff = train_cutoff,
+  target       = "fDOM_1_QSU_daily",
+  lag_col      = "fDOM_1m_lag1",
+  covariates   = c("RH_Q_cms", "RH_DOC_mgL"),
+  model_name   = "XGB_lag_catchment",
+  window_years = window_years
+)
+
+# XGB4: lag + in-lake + catchment
+XGB_lake_catch <- fit_xgb_model(
+  all_data     = ar_df,
+  train_cutoff = train_cutoff,
+  target       = "fDOM_1_QSU_daily",
+  lag_col      = "fDOM_1m_lag1",
+  covariates   = c("Diff_Dens_1_max", "DOsat_1_pct_daily", "Chla_1_ugL_daily",
+                   "RH_Q_cms", "RH_DOC_mgL"),
+  model_name   = "XGB_lag_lake_catchment",
+  window_years = window_years
+)
+```
+
+### Training plots
+
+```{r plot-training, fig.height=4}
+XGB_lake$plot
+XGB_catch$plot
+XGB_lake_catch$plot
+```
+
+### Variable importance plots
+
+```{r plot-importance, fig.height=4}
+XGB_lake$importance_plot
+XGB_catch$importance_plot
+XGB_lake_catch$importance_plot
+```
+
+### Tuned hyperparameters
+
+Best hyperparameter combination selected via cross-validated random search for each
+model (mirrors the ARIMA order / NNAR(p,k) structure reporting for the other models).
+
+```{r print-hyperparams}
+bind_rows(
+  XGB_lake$best_params       |> mutate(model_name = XGB_lake$model_name, .before = 1),
+  XGB_catch$best_params      |> mutate(model_name = XGB_catch$model_name, .before = 1),
+  XGB_lake_catch$best_params |> mutate(model_name = XGB_lake_catch$model_name, .before = 1)
+)
+```
+
+---
+
+## 30-Day Forecast Function
+
+Hyperparameters are fixed from the initial tuning step. At each reference date,
+`model_obj$final_wf` (the finalized but unfitted workflow) is refit on only the
+rolling `window_years` window ending at that date (via `get_train_window()`) — not
+the full expanding history. Tree weights update, structure stays fixed.
+
+The iterated 30-day for-loop propagates predicted fDOM as the lag for each next step,
+with observed covariate values at each step (perfect covariate assumption).
+
+```{r fn-forecast}
+# # inputs to test function
+# forecast_date <- ymd("2024-01-01")
+# model_obj <- XGB_lake_catch
+# all_data <- ar_df
+# target  = "fDOM_1_QSU_daily"
+# horizon = 30
+
+forecast_fdom_30day <- function(forecast_date,
+                                 model_obj,
+                                 all_data,
+                                 target       = "fDOM_1_QSU_daily",
+                                 horizon      = 30,
+                                 window_years = 2) {
+
+  lag_col      <- model_obj$lag_col
+  covariates   <- model_obj$covariates
+  feature_cols <- model_obj$feature_cols
+
+  # Seed: observed fDOM on the reference date
+  curr_fdom <- all_data |>
+    filter(Date == forecast_date) |>
+    pull(!!sym(target))
+
+  if (length(curr_fdom) == 0 || is.na(curr_fdom)) return(NULL)
+
+  # Refit on the rolling window_years window ending at (not including) the
+  # reference date -- not the full expanding history
+  train_window <- get_train_window(forecast_date, window_years)
+
+  history_df <- all_data |>
+    filter(Date >= train_window$start, Date < train_window$end) |>
+    select(all_of(c(target, feature_cols))) |>
+    na.omit()
+
+  model <- model_obj$final_wf |> fit(data = history_df)
+
+  # Forecast dates: day 1 through day 30 after reference date
+  forecast_dates <- seq(forecast_date + 1, forecast_date + horizon, by = "day")
+
+  # Build full drivers dataframe upfront — observed covariates for all forecast days
+  # (Melofton et al. approach: fill all covariate rows first, update lag iteratively)
+  drivers <- all_data |>
+    filter(Date %in% forecast_dates) |>
+    select(Date, all_of(feature_cols)) |>
+    arrange(Date)
+
+  if (nrow(drivers) == 0) return(NULL)
+
+  # Seed the lag column: first forecast step uses observed fDOM on reference date
+  # drivers[[lag_col]][1] <- curr_fdom
+
+  # Step forward one day at a time — only the lag column is updated each step
+  pred_vals <- numeric(nrow(drivers))
+  for (h in 1:nrow(drivers)) {
+    temp_pred <- predict(model, new_data = drivers[h, feature_cols])$.pred
+    pred_vals[h] <- temp_pred
+    if (h < nrow(drivers)) {
+      drivers[[lag_col]][h + 1] <- temp_pred
+    }
+  }
+
+  tibble(
+    model_id          = model_obj$model_name,
+    reference_date    = forecast_date,
+    forecast_date     = drivers$Date,
+    Horizon           = as.integer(drivers$Date - reference_date),
+    fDOM_1m_predicted = pred_vals
+  )
+}
+
+# # test function
+# zz <- forecast_fdom_30day(forecast_date = ymd("2025-01-01"), model_obj = XGB_lake_catch,
+#                     all_data = ar_df, target = "fDOM_1_QSU_daily", horizon = 30)
+
+```
+
+---
+
+## Run Forecasts
+
+`window_years` is passed through so the rolling-window length used for every daily
+refit can be changed in one place.
+
+```{r fn-loop}
+run_forecasts <- function(model_obj,
+                           all_data,
+                           pred_dates,
+                           target       = "fDOM_1_QSU_daily",
+                           horizon      = 30,
+                           window_years = 2) {
+
+  valid_dates <- all_data |>
+    filter(Date %in% pred_dates, !is.na(!!sym(target))) |>
+    pull(Date)
+
+  message(model_obj$model_name, " | forecasting ", length(valid_dates),
+          " reference dates (", window_years, "yr rolling refit)...")
+
+  map_dfr(valid_dates, \(d) {
+    cat("  -> starting forecast for ", format(d), "\n")
+    forecast_fdom_30day(
+      forecast_date = d,
+      model_obj     = model_obj,
+      all_data      = all_data,
+      target        = target,
+      horizon       = horizon,
+      window_years  = window_years
+    )
+  })
+}
+```
+
+Takes ~30 min to run
+```{r run-forecasts}
+forecasts_xgb2 <- run_forecasts(XGB_lake,       ar_df, pred_dates, window_years = window_years)
+forecasts_xgb3 <- run_forecasts(XGB_catch,      ar_df, pred_dates, window_years = window_years)
+forecasts_xgb4 <- run_forecasts(XGB_lake_catch, ar_df, pred_dates, window_years = window_years)
+
+all_XGB_forecasts <- bind_rows(forecasts_xgb2, forecasts_xgb3, forecasts_xgb4)
+
+glimpse(all_XGB_forecasts)
+```
+
+---
+
+## Save Output
+
+```{r save}
+write_csv(all_XGB_forecasts,
+          "../Data/XGB_forecasts_2024-2025_RollingRefit_24july26.csv")
+
+
+```
