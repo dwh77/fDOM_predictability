@@ -5,10 +5,6 @@ date: "2026-05-22"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ## Packages and Data
 
 ```{r packages}
@@ -27,15 +23,15 @@ eval <- read_csv("../Data/Daily_catwalk_RH_2021_2026.csv") |>
 
 
 ##4 cast outputs 
-AR <- read_csv("../Data/AR_forecasts_2024-2025_27may26.csv")
+AR <- read_csv("../Data/AR_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-ARIMA <- read_csv("../Data/ARIMA_forecasts_2024-2025_27may26.csv")
+ARIMA <- read_csv("../Data/ARIMA_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-XGB <- read_csv("../Data/XGB_forecasts_2024-2025_27may26.csv")
+XGB <- read_csv("../Data/XGB_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-NNETAR <- read_csv("../Data/NNETAR_forecasts_2024-2025_27may26.csv")
+NNETAR <- read_csv("../Data/NNETAR_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-Persistence <- read_csv("../Data/Persistence_forecasts_2024-2025_27may26.csv")
+Persistence <- read_csv("../Data/Persistence_forecasts_2024-2025_17july26.csv")
 
 
 #join predictions 
@@ -108,8 +104,8 @@ rmse_persistence <- metrics_eval_all |>
 
 #### RMSE across full time
 rmse_fig4 <- metrics_eval_all |> 
-  filter(model_class == "Ensemble") |> 
-  # filter(model_class %in% c("Ensemble", "Persistence")) |> 
+  #filter(model_class == "AR") |> 
+  filter(model_class == "Ensemble") |>   # filter(model_class %in% c("Ensemble", "Persistence")) |> 
   ggplot(aes(x = Horizon, y = RMSE, col = model_vars)) +
   geom_line(linewidth = 1.5) +
   # facet_wrap(~model_class)+
@@ -126,12 +122,13 @@ rmse_fig4
 
 #### Skill across full time
 skill_fig4 <- metrics_eval_all |> 
+  #filter(model_class == "AR") |> 
   filter(model_class == "Ensemble") |> 
   left_join(rmse_persistence, by = "Horizon") |>
   mutate(Skill = 1 - (RMSE / RMSE_persistence)) |> 
   ggplot(aes(x = Horizon, y = Skill, color = model_vars)) +
   geom_line(linewidth = 1.5) +
-  ylim(-0.05, 0.25)+
+  ylim(-0.5, 0.3)+
   # facet_wrap(~model_class)+
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   scale_color_manual(values = model_vars_colors)+
@@ -186,12 +183,19 @@ metrics_eval_all |>
   scale_color_manual(values = model_vars_colors) +
   # ylim(0.5, 3.2)+
   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Less accurate", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "More accurate", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
 
+#### RMSE by model flipped presentation
+metrics_eval_all |> 
+  # filter(model_class == "Ensemble") |> 
+  # filter(model_class %in% c("Ensemble", "Persistence")) |> 
+  ggplot(aes(x = Horizon, y = RMSE, col = model_class)) +
+  geom_line(linewidth = 1.5) +
+  facet_wrap(~model_vars)+
+  # scale_color_manual(values = model_vars_colors) +
+  # ylim(0.5, 3.2)+
+  labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
+  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
 
 
 #### skill by model
@@ -206,10 +210,6 @@ metrics_eval_all |>
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   scale_color_manual(values = model_vars_colors)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Better than null", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "Worse than null", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   theme_bw() +
   theme(legend.position = "top", text = element_text(size = 18))
 
@@ -260,14 +260,53 @@ metrics_eval_all |>
 
 
 
-## Stratfication based on Density diff 
+## Absolute error over time: ensemble, 1/15/30-day horizons
+
+```{r}
+
+Pred_eval_df |>
+  filter(model_class == "Ensemble", Horizon %in% c(1, 15, 30)) |>
+  filter(!is.na(fDOM_1m_predicted), !is.na(fDOM_1m_obs)) |>
+  mutate(abs_error = abs(fDOM_1m_predicted - fDOM_1m_obs),
+         Horizon   = factor(Horizon, levels = c(1, 15, 30))) |>
+  ggplot(aes(x = forecast_date, y = abs_error, color = model_vars)) +
+  geom_line(linewidth = 0.7) +
+  facet_wrap(~Horizon, ncol = 1, scales = "free_y") +
+  scale_x_date(date_breaks = "2 months", date_labels = "%b")+
+  scale_color_manual(values = model_vars_colors)+
+  labs(x = "Date", y = "Absolute Error (QSU)", color = "Horizon (days)",
+       title = "Ensemble absolute error over time, 1/15/30-day horizons") +
+  theme_bw() +
+  theme(legend.position = "top", text = element_text(size = 14))
+
+```
+
+
+## Stratfication based on Density diff
 
 ```{r}
 ## get strat classification
 strat <- read_csv("../Data/Daily_catwalk_RH_2021_2026.csv") |> 
   select(Date, Diff_Dens_1_max) |> 
-  mutate(Strat = ifelse(Diff_Dens_1_max > 0.1, "Strat", "Mixed"))
+  mutate(Strat = ifelse(Diff_Dens_1_max > 0.1, "Stratified", "Mixed"))
 
+
+## labels
+rmse_labels <- data.frame(
+  Strat = "Mixed",
+  x     = c(Inf, Inf),
+  y     = c(Inf, -Inf),
+  label = c("Less accurate", "More accurate"),
+  vjust = c(1.5, -0.5)
+)
+
+skill_labels <- data.frame(
+  Strat = "Mixed",
+  x     = c(Inf, Inf),
+  y     = c(Inf, -Inf),
+  label = c("Better than null", "Worse than null"),
+  vjust = c(1.5, -0.5)
+)
 
 ## calc eval metrics across all models 
 metrics_eval_STRAT <- Pred_eval_df |> 
@@ -296,10 +335,8 @@ rmse_STRAT <- metrics_eval_STRAT |>
   scale_color_manual(values = model_vars_colors) +
   # ylim(0.5, 3.2)+
   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Less accurate", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "More accurate", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
+  geom_text(data = rmse_labels, aes(x = x, y = y, label = label, vjust = vjust),
+          hjust = 1.1, size = 4, fontface = "italic", color = "grey40", inherit.aes = FALSE)+
   theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
 
 rmse_STRAT
@@ -316,10 +353,8 @@ skill_STRAT <- metrics_eval_STRAT |>
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   scale_color_manual(values = model_vars_colors)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Better than null", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "Worse than null", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
+  geom_text(data = skill_labels, aes(x = x, y = y, label = label, vjust = vjust),
+          hjust = 1.1, size = 4, fontface = "italic", color = "grey40", inherit.aes = FALSE)+
   theme_bw() +
   theme(legend.position = "top", text = element_text(size = 18))
 
@@ -343,35 +378,7 @@ based on USGS tinker gauge
 get tinker data and join
 
 ```{r}
-# ##USGS data
-# USGS_daily <- dataRetrieval::readNWISdv(
-#   siteNumbers = "02055100",
-#   parameterCd = "00060",          # discharge in cfs
-#   startDate = "2023-01-01",
-#   endDate   = "2026-04-01"
-# ) |>  dataRetrieval::renameNWISColumns()
-# 
-# #set up flow percentile
-# flow_percentiles <- USGS_daily |>
-#   filter(Date >= ymd("2024-01-01"), Date <= ymd("2026-01-31")) |>
-#   filter(!is.na(Flow)) |>
-#   mutate(flow_percentile = percent_rank(Flow) * 100)
-# 
-# # flag top and bottom 10th percentile dates
-# flow_flags <- flow_percentiles |>
-#   mutate(
-#     decile     = ntile(Flow, 10),
-#     flow_class = case_when(
-#       decile == 1  ~ "Low flow",
-#       decile == 10 ~ "High flow",
-#       TRUE         ~ "Normal"
-#     )
-#   ) |>
-#   select(Date, Flow, flow_percentile, decile, flow_class)
-# 
-# flow_flag_check <- flow_flags |> 
-#   filter(flow_class != "Normal")
-
+#change change flow class to be flow_class_usgs to use just the USGS data based classifications
 flow_flags <- read_csv("../Data/HPB_USGS_Flows.csv") |> 
    select(Date, flow_class = flow_class_hpb) 
 
@@ -397,6 +404,7 @@ RMSE and skill
 
 #RMSE from ensemble
 DryWet2_ens <- DryWet2 |> 
+  #filter(model_class == "AR")
   filter(grepl("Ensemble", model_id)) 
   
 flowrmse2 <- DryWet2_ens |>
@@ -404,10 +412,6 @@ flowrmse2 <- DryWet2_ens |>
   geom_line(linewidth = 1.5) +
   facet_wrap(~flow_class) +
   labs(x = "Prediction Horizon (days)", y = "RMSE (QSU)", color = NULL) +
-  #   annotate("text", x = Inf, y = Inf,  label = "Less accurate", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "More accurate", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   scale_color_manual(values = model_vars_colors)+
   theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
 
@@ -431,10 +435,6 @@ flowskill2 <- skill_DryWet2 |>
   facet_wrap(~flow_class) +
   # ylim(-3.5, 1)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Better than null", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "Worse than null", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   scale_color_manual(values = model_vars_colors)+
   theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
 
@@ -463,9 +463,12 @@ eval2 <- eval |> mutate(fDOM_1dif = abs(fDOM_1m_obs - lag(fDOM_1m_obs, 1)))
 
 summary(eval2$fDOM_1dif)
 quantile(eval2$fDOM_1dif, probs = 0.9, na.rm = TRUE)
+quantile(eval2$fDOM_1dif, probs = 0.1, na.rm = TRUE)
 
 
-eval2$HighVar = ifelse(eval2$fDOM_1dif > 0.68, "High_Var", "Low_Var" )
+
+eval2$HighVar = ifelse(eval2$fDOM_1dif > 0.68, "High Variability", NA )
+eval2$HighVar = ifelse(eval2$fDOM_1dif < 0.03, "Low Variability", eval2$HighVar )
 
 highvar_df <- eval2 |> select(Date, HighVar)
 
@@ -477,6 +480,7 @@ highvar_df <- eval2 |> select(Date, HighVar)
 #### RMSE
 rmse_HighVar <-  Pred_eval_df |> 
   left_join(highvar_df, by = c("forecast_date" = "Date")) |> 
+  #filter(model_class == "AR") |> 
   filter(grepl("Ensemble", model_id))  |>
   filter(!is.na(fDOM_1m_predicted), !is.na(fDOM_1m_obs),
          !is.na(HighVar)) |>
@@ -490,10 +494,6 @@ highvar_rmse <- rmse_HighVar |>
   geom_line(linewidth = 1.5) +
   facet_wrap(~HighVar) +
   labs(x = "Prediction Horizon (days)", y = "RMSE (QSU)", color = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Less accurate", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "More accurate", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   scale_color_manual(values = model_vars_colors)+
   theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
 
@@ -519,11 +519,8 @@ highvar_skill <- skill_HighVar |>
   geom_line(linewidth = 1.5) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   facet_wrap(~HighVar) +
+  ylim(-1,0.5)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  # annotate("text", x = Inf, y = Inf,  label = "Better than null", 
-  #          hjust = 1.1, vjust = 1.5, size = 4, fontface = "italic", color = "grey40") +
-  # annotate("text", x = Inf, y = -Inf, label = "Worse than null", 
-  #          hjust = 1.1, vjust = -0.5, size = 4, fontface = "italic", color = "grey40") +
   scale_color_manual(values = model_vars_colors)+
   theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
 
