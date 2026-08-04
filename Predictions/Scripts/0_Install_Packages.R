@@ -16,6 +16,8 @@ install.packages('dataRetrieval') # USGS streamflow retrieval
 install.packages('sf')            # dataRetrieval returns sf objects; st_drop_geometry()
 install.packages('ggpmisc')       # stat_poly_line / stat_poly_eq regression annotations
 install.packages('gt')            # summary tables (Synthesis_fDOM_Variability.R)
+install.packages('FSA')           # dunnTest() post-hoc (Synthesis_fDOM_Variability.R)
+install.packages('rcompanion')    # cldList() compact letter display (Synthesis_fDOM_Variability.R)
 
 ## Forecasting models (3a-3d Predict_*.Rmd and *_NoRefit.Rmd)
 install.packages('fable')      # ARIMA() and NNETAR()
