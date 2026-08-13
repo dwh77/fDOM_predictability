@@ -8,26 +8,26 @@ library(slider) # for rolling windows 'slide_dbl'
 
 
 #### Daily Met ----
-options(timeout = 600)  # 10 minutes
-met <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1105/4/8ebf27393ccafe518328468a260d2e18")
-range(met$DateTime)
-
-met_githubL1 <- read.csv("https://raw.githubusercontent.com/FLARE-forecast/CCRE-data/refs/heads/ccre-dam-data-qaqc/ccre_met_L1.csv")
-range(met_githubL1$DateTime)
-
-
-# #Get daily summed rain and mean SW
-daily_met <- plyr::rbind.fill(met, met_githubL1) |>
-  select(DateTime, Rain_Total_mm, ShortwaveRadiationUp_Average_W_m2) |>
-  mutate(Date = as.Date(DateTime)) |>
-  group_by(Date) |>
-  summarise(Rain_mm_daily = sum(Rain_Total_mm, na.rm = T),
-            SW_Wm2_daily = mean(ShortwaveRadiationUp_Average_W_m2, na.rm = T))
+# options(timeout = 600)  # 10 minutes
+# met <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1105/4/8ebf27393ccafe518328468a260d2e18")
+# range(met$DateTime)
+#
+# met_githubL1 <- read.csv("https://raw.githubusercontent.com/FLARE-forecast/CCRE-data/refs/heads/ccre-dam-data-qaqc/ccre_met_L1.csv")
+# range(met_githubL1$DateTime)
+#
+#
+# # #Get daily summed rain and mean SW
+# daily_met <- plyr::rbind.fill(met, met_githubL1) |>
+#   select(DateTime, Rain_Total_mm, ShortwaveRadiationUp_Average_W_m2) |>
+#   mutate(Date = as.Date(DateTime)) |>
+#   group_by(Date) |>
+#   summarise(Rain_mm_daily = sum(Rain_Total_mm, na.rm = T),
+#             SW_Wm2_daily = mean(ShortwaveRadiationUp_Average_W_m2, na.rm = T))
 
 
 
 #### EDI data sets ----
-catwalk_EDI <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1069/4/42e6d8bb3d379d40a4a4fb566d4ff36e" )
+catwalk_EDI <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1069/4/42e6d8bb3d379d40a4a4fb566d4ff36e?key=yltMpS4UEIk12AvB9L7OL5uRiG0" )
 summary(ymd_hms(catwalk_EDI$DateTime))
 
 catwalk_githubL1 <- read.csv("https://raw.githubusercontent.com/FLARE-forecast/CCRE-data/refs/heads/ccre-dam-data-qaqc/ccre-waterquality_L1.csv")
@@ -77,9 +77,9 @@ catwalk_daily <- catwalk |>
 source("./Predictions/Scripts/find_depths.R")
 # depth_offsets_df <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1069/4/23caf92df7e665597ebc329d9e406637")
 
-catwalk_EDI_link <- "https://pasta.lternet.edu/package/data/eml/edi/1069/4/42e6d8bb3d379d40a4a4fb566d4ff36e"
+catwalk_EDI_link <- "https://pasta.lternet.edu/package/data/eml/edi/1069/4/42e6d8bb3d379d40a4a4fb566d4ff36e?key=yltMpS4UEIk12AvB9L7OL5uRiG0"
 catwalk_github_link <- "https://raw.githubusercontent.com/FLARE-forecast/CCRE-data/refs/heads/ccre-dam-data-qaqc/ccre-waterquality_L1.csv"
-depth_offsets_link <- "https://pasta.lternet.edu/package/data/eml/edi/1069/4/23caf92df7e665597ebc329d9e406637"
+depth_offsets_link <- "https://pasta.lternet.edu/package/data/eml/edi/1069/4/23caf92df7e665597ebc329d9e406637?key=yltMpS4UEIk12AvB9L7OL5uRiG0"
 
 
 depths_EDI <- find_depths(data_file = catwalk_EDI_link,
@@ -191,14 +191,18 @@ ccr_area_m2 <- 45.83578 * 1000000
 output_h2o_grow <- left_join(output_h2o, output_grow, by = c("day", "month", "year", "basinID")) |>
   mutate(date = ymd(paste(year, month, day, sep = "-"))) |>
   filter(date >= ymd("2021-04-01")) |>
-  select(date, streamflow, streamflow_NO3, streamflow_DOC, lai.y) |>
+  select(date, streamflow, streamflow_NO3, streamflow_DOC, streamflow_DON, lai.y) |>
   rename(lai = lai.y) |>
   #Q unit conversions
   mutate(streamflow_m_day = streamflow / 1000) |> #convert mm/day to m/day
   mutate(streamflow_m3_day = streamflow_m_day * ccr_area_m2) |> #convert m/day to m3/day
   #chem conversions from g/m2/day to mg/L
   mutate(DOC_mgL = streamflow_DOC / streamflow_m_day,
-         NO3_mgL = streamflow_NO3 / streamflow_m_day)
+         DON_mgL = streamflow_DON / streamflow_m_day,
+         NO3_mgL = streamflow_NO3 / streamflow_m_day) |>
+  #loads kg/day
+  mutate(DOC_load_kg_day = (streamflow_DOC *ccr_area_m2) / 1000,
+         DON_load_kg_day = (streamflow_DON *ccr_area_m2) / 1000)
 
 
 #format data for join
@@ -210,22 +214,33 @@ rhessys_df <- output_h2o_grow |>
          RH_DOC_mgL = DOC_mgL)
 
 
+# rhessys_df2 <- output_h2o_grow |>
+#   rename(Date = date) |>
+#   mutate(streamflow_cms = streamflow_m3_day / 86400) |>
+#   select(Date, streamflow_cms, DOC_mgL, DON_mgL, DOC_load_kg_day, DON_load_kg_day) |>
+#   rename(RH_Q_cms = streamflow_cms,
+#          RH_DOC_mgL = DOC_mgL,
+#          RH_DON_mgL = DON_mgL) |>
+#   mutate(RH_DOM_mgL = RH_DOC_mgL + RH_DON_mgL,
+#          DOM_load_kg_day = DOC_load_kg_day + DON_load_kg_day)
+
+
 
 #### format and export
 datecheck <- seq(ymd("2021-08-19"), ymd("2026-02-01"), by = "day")
 
-Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
-  full_join(daily_met, by = "Date") |>
+Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df2, by = "Date") |>
+  # full_join(daily_met, by = "Date") |>
   filter(Date >= ymd("2021-08-19"),
          Date <= ymd("2026-02-01")) |>
   arrange(Date) |>
-  mutate(fDOM_1m_lag1 = lag(fDOM_1_QSU_daily , 1)) |>
-  mutate(
-    Chla_1_ugL_7day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 7, .after = 0, .complete = F),
-    Chla_1_ugL_14day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 14, .after = 0, .complete = F),
-    RH_Q_cms_7day = slider::slide_dbl(RH_Q_cms, mean, .before = 7, .after = 0, .complete = F),
-    RH_Q_cms_14day = slider::slide_dbl(RH_Q_cms, mean, .before = 14, .after = 0, .complete = F),
-  )
+  mutate(fDOM_1m_lag1 = lag(fDOM_1_QSU_daily , 1))
+  # mutate(
+  #   Chla_1_ugL_7day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 7, .after = 0, .complete = F),
+  #   Chla_1_ugL_14day = slider::slide_dbl(Chla_1_ugL_daily, mean, .before = 14, .after = 0, .complete = F),
+  #   RH_Q_cms_7day = slider::slide_dbl(RH_Q_cms, mean, .before = 7, .after = 0, .complete = F),
+  #   RH_Q_cms_14day = slider::slide_dbl(RH_Q_cms, mean, .before = 14, .after = 0, .complete = F),
+  # )
   # # Z-score
   # mutate(across(
   #   .cols = !Date,
@@ -235,6 +250,8 @@ Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
 
 
 #### Check lags and coor matrix
+
+Catwalk_RH_df <- read_csv("./Predictions/Data/Extras_Daily_Cat_Met_RH_2021_2026.csv")
 
 ## ACF
 library(astsa)
@@ -246,37 +263,34 @@ pacf(Catwalk_RH_df$fDOM_1_QSU_daily, xlim = c(1,20), na.action = na.pass)
 library(corrplot)
 
 df_corr1m <- Catwalk_RH_df |>
-  #select(-Date, fDOM_1m_lag1)
-  select(-c(Date, fDOM_1m_lag1, Chla_1_ugL_7day, Chla_1_ugL_14day, RH_Q_cms_7day, RH_Q_cms_14day,
-            Temp_1_C_daily, Diff_C_1_max, Rain_mm_daily, SW_Wm2_daily))
+  # select(fDOM_1_QSU_daily, Temp_1_C_daily, Diff_Dens_1_max)
+   select(-Date, -fDOM_1m_lag1)
+  # select(-c(Date, fDOM_1m_lag1, Chla_1_ugL_7day, Chla_1_ugL_14day, RH_Q_cms_7day, RH_Q_cms_14day,
+  #           Temp_1_C_daily, Diff_C_1_max, Rain_mm_daily, SW_Wm2_daily))
 
 
 cor_matrix <- cor(df_corr1m, use = "pairwise.complete.obs")
 
-# Step 1: plot with all numbers in normal weight
+# compute p-values
+p_matrix <- cor.mtest(df_corr1m, conf.level = 0.95)$p
+
+# create significance mask based on |r| > 0.5
+sig_matrix <- ifelse(abs(cor_matrix) > 0.5, 0.04, 1)  # trick: use p.mat cutoff logic
+
 corrplot(cor_matrix,
          method      = "color",
          type        = "upper",
-         addCoef.col = "black",
          tl.col      = "black",
          tl.srt      = 45,
-         number.font = 1,          # all normal weight first
-         col         = colorRampPalette(c("#D73027", "#FFFFBF", "#1A9850"))(200))
-
-# Step 2: overlay bold numbers only where |r| >= 0.5
-bold_matrix <- cor_matrix
-bold_matrix[abs(cor_matrix) < 0.5] <- NA  # hide the weak ones
-
-corrplot(bold_matrix,
-         method      = "color",
-         type        = "upper",
-         add         = TRUE,       # overlay on existing plot
-         addCoef.col = "black",
-         tl.pos      = "n",        # suppress repeated labels
-         cl.pos      = "n",        # suppress repeated legend
-         number.font = 2,          # bold
-         col         = colorRampPalette(c("#D73027", "#FFFFBF", "#1A9850"))(200))
-
+         tl.cex      = 0.8,
+         cl.cex      = 0.8,
+         mar         = c(0, 0, 0, 0),
+         p.mat       = sig_matrix,
+         sig.level   = 0.05,
+         pch         = "*",
+         pch.cex     = 2,
+         insig       = "label_sig",
+         col         = colorRampPalette(c("red", "white", "blue"))(200))
 
 
 
