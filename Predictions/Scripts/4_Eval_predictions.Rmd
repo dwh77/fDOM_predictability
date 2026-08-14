@@ -22,21 +22,18 @@ eval <- read_csv("../Data/Daily_catwalk_RH_2021_2026.csv") |>
   rename(fDOM_1m_obs = fDOM_1_QSU_daily)
 
 
+na_check <- eval |> filter(is.na(fDOM_1m_obs)) |> filter(Date >= ymd("2024-01-01"))
+
 ##4 cast outputs 
-AR <- read_csv("../Data/AR_forecasts_2024-2025_RollingRefit_24july26.csv")
+AR <- read_csv("../Data/Predictions/AR_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-ARIMA <- read_csv("../Data/ARIMA_forecasts_2024-2025_RollingRefit_24july26.csv")
+ARIMA <- read_csv("../Data/Predictions/ARIMA_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-XGB <- read_csv("../Data/XGB_forecasts_2024-2025_RollingRefit_24july26.csv")
+XGB <- read_csv("../Data/Predictions/XGB_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-NNETAR <- read_csv("../Data/NNETAR_forecasts_2024-2025_RollingRefit_24july26.csv")
+NNETAR <- read_csv("../Data/Predictions/NNETAR_forecasts_2024-2025_RollingRefit_24july26.csv")
 
-# AR <- read_csv("../Data/AR_forecasts_2024-2025_21july26_dailyRefit.csv")
-# ARIMA <- read_csv("../Data/ARIMA_forecasts_2024-2025_21july26_dailyRefit.csv")
-# XGB <- read_csv("../Data/XGB_forecasts_2024-2025_21july26_dailyRefit.csv")
-# NNETAR <- read_csv("../Data/NNETAR_forecasts_2024-2025_21july26_dailyRefit.csv")
-
-Persistence <- read_csv("../Data/Persistence_forecasts_2024-2025_17july26.csv")
+Persistence <- read_csv("../Data/Predictions/Persistence_forecasts_2024-2025_17july26.csv")
 
 
 #join predictions 
@@ -66,17 +63,22 @@ predictions <- rbind(predictions, predict_ensemble) |>
 unique(predictions$model_id)
 
 #### join
-Pred_eval_df <- left_join(predictions, eval, by = c("forecast_date" =  "Date" )) |> 
-  mutate(model_class = sub("_.*", "", model_id)) |> 
-  mutate(model_vars = sub("^[^_]*_[^_]*_", "", model_id)) |> 
+Pred_eval_df <- left_join(predictions, eval, by = c("forecast_date" =  "Date" )) |>
+  mutate(model_class = sub("_.*", "", model_id)) |>
+  mutate(model_vars = sub("^[^_]*_[^_]*_", "", model_id)) |>
+  mutate(model_vars = case_match(model_vars,
+                                  "lake"           ~ "WaterColumn",
+                                  "catchment"      ~ "Catchment",
+                                  "lake_catchment" ~ "WaterColumn+Catchment",
+                                  .default = model_vars)) |>
   select(model_id, model_class, model_vars,
          reference_date, forecast_date, Horizon,
          fDOM_1m_predicted, fDOM_1m_obs
          )
 
 
-##set model colors 
-model_vars_colors <- c("lake" = "#56B4E9", "catchment" = "#009E73", "lake_catchment" = "#CC79A7", "Persistence" = "black")
+##set model colors
+model_vars_colors <- c("WaterColumn" = "#56B4E9", "Catchment" = "#009E73", "WaterColumn+Catchment" = "#CC79A7", "Persistence" = "black")
 
 #c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
 
@@ -150,7 +152,7 @@ skill_fig4
 
 ##join figure 4
 
-rmse_fig4 | skill_fig4
+# rmse_fig4 | skill_fig4
 
 # ggpubr::ggarrange(rmse_fig3, skill_fig3, ncol = 2, labels = "auto")
 
@@ -162,14 +164,20 @@ fig4_fig <- ggpubr::ggarrange(
   labels = c("a", "b")
 )
 
-ggpubr::annotate_figure(fig4_fig,
+fig4_fig <- ggpubr::annotate_figure(fig4_fig,
   bottom = ggpubr::text_grob("Prediction Horizon (days)", size = 18)
 )
+
+fig4_fig
+
+# ggsave("../Figures/RMSE_Skill_Fig4.png", fig4_fig, width = 6, height = 4, units = "in")
 
 
 ##plotly figures
 # plotly::ggplotly(rmse_fig4)
 # plotly::ggplotly(skill_fig4)
+
+
 
 ```
 
@@ -180,6 +188,7 @@ RMSE and Skill by model: MS Figure 3
 
 #### RMSE by model
 metrics_eval_all |> 
+  mutate(model_class = ifelse(model_class == "NNETAR", "NNAR", model_class)) |> 
   # filter(model_class == "Ensemble") |> 
   # filter(model_class %in% c("Ensemble", "Persistence")) |> 
   ggplot(aes(x = Horizon, y = RMSE, col = model_vars)) +
@@ -188,35 +197,38 @@ metrics_eval_all |>
   scale_color_manual(values = model_vars_colors) +
   # ylim(0.5, 3.2)+
   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
-  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
+  theme_bw() + theme(legend.position = "top", text = element_text(size = 16))
+
+ggsave("../Figures/SI_rmse_by_structure.png", width = 7, height = 5, units = "in")
+
 
 #### RMSE by model flipped presentation
-metrics_eval_all |> 
-  # filter(model_class == "Ensemble") |> 
-  # filter(model_class %in% c("Ensemble", "Persistence")) |> 
-  ggplot(aes(x = Horizon, y = RMSE, col = model_class)) +
-  geom_line(linewidth = 1.5) +
-  facet_wrap(~model_vars)+
-  # scale_color_manual(values = model_vars_colors) +
-  # ylim(0.5, 3.2)+
-  labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
-  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
+# metrics_eval_all |> 
+#   # filter(model_class == "Ensemble") |> 
+#   # filter(model_class %in% c("Ensemble", "Persistence")) |> 
+#   ggplot(aes(x = Horizon, y = RMSE, col = model_class)) +
+#   geom_line(linewidth = 1.5) +
+#   facet_wrap(~model_vars)+
+#   # scale_color_manual(values = model_vars_colors) +
+#   # ylim(0.5, 3.2)+
+#   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
+#   theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
 
 
 #### skill by model
-metrics_eval_all |> 
-  filter(model_class != "Persistence") |> 
-  left_join(rmse_persistence, by = "Horizon") |>
-  mutate(Skill = 1 - (RMSE / RMSE_persistence)) |> 
-  ggplot(aes(x = Horizon, y = Skill, color = model_vars)) +
-  geom_line(linewidth = 1.5) +
-  # ylim(-0.05, 0.25)+
-  facet_wrap(~model_class)+
-  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
-  scale_color_manual(values = model_vars_colors)+
-  labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  theme_bw() +
-  theme(legend.position = "top", text = element_text(size = 18))
+# metrics_eval_all |> 
+#   filter(model_class != "Persistence") |> 
+#   left_join(rmse_persistence, by = "Horizon") |>
+#   mutate(Skill = 1 - (RMSE / RMSE_persistence)) |> 
+#   ggplot(aes(x = Horizon, y = Skill, color = model_vars)) +
+#   geom_line(linewidth = 1.5) +
+#   # ylim(-0.05, 0.25)+
+#   facet_wrap(~model_class)+
+#   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
+#   scale_color_manual(values = model_vars_colors)+
+#   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
+#   theme_bw() +
+#   theme(legend.position = "top", text = element_text(size = 18))
 
 
 
@@ -245,7 +257,7 @@ RMSE, MAE, and R2 for SI
 
 ```{r}
 
-metrics_eval_all |> 
+si_mae_r2_rmse <- metrics_eval_all |> 
   filter(model_class == "Ensemble") |> 
   pivot_longer(-c(1:4)) |> 
   # filter(model_class %in% c("Ensemble", "Persistence")) |> 
@@ -256,7 +268,32 @@ metrics_eval_all |>
   labs(x = "Prediction horizon (days)", y = "value", col = NULL) +
     theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
 
+# create labeller for nice facet names
+metric_labels <- c(
+  "RMSE" = "RMSE",
+  "MAE"  = "MAE",
+  "r2"   = "R^2"
+)
 
+si_mae_r2_rmse <- metrics_eval_all |> 
+  filter(model_class == "Ensemble") |> 
+  pivot_longer(-c(1:4)) |>
+  mutate(name = factor(name, levels = c("RMSE", "MAE", "r2"))) |>  # set order
+  ggplot(aes(x = Horizon, y = value, col = model_vars)) +
+  geom_line(linewidth = 1.5) +
+   facet_wrap(~name, nrow = 1, scales = "free_y",
+             labeller = labeller(name = as_labeller(metric_labels, label_parsed)))+
+  scale_color_manual(values = model_vars_colors) +
+  labs(x = "Prediction horizon (days)", col = NULL) +
+  theme_bw() + theme(legend.position = "top", text = element_text(size = 16))
+
+
+si_mae_r2_rmse
+
+# ggsave("../Figures/SI_rmse_mae_r2.png", si_mae_r2_rmse, width = 6, height = 4, units = "in")
+
+
+# plotly::ggplotly(si_mae_r2_rmse)
 
 
 ```
@@ -269,20 +306,20 @@ metrics_eval_all |>
 
 ```{r}
 
-Pred_eval_df |>
-  filter(model_class == "Ensemble", Horizon %in% c(1, 15, 30)) |>
-  filter(!is.na(fDOM_1m_predicted), !is.na(fDOM_1m_obs)) |>
-  mutate(abs_error = abs(fDOM_1m_predicted - fDOM_1m_obs),
-         Horizon   = factor(Horizon, levels = c(1, 15, 30))) |>
-  ggplot(aes(x = forecast_date, y = abs_error, color = model_vars)) +
-  geom_line(linewidth = 0.7) +
-  facet_wrap(~Horizon, ncol = 1, scales = "free_y") +
-  scale_x_date(date_breaks = "2 months", date_labels = "%b")+
-  scale_color_manual(values = model_vars_colors)+
-  labs(x = "Date", y = "Absolute Error (QSU)", color = "Horizon (days)",
-       title = "Ensemble absolute error over time, 1/15/30-day horizons") +
-  theme_bw() +
-  theme(legend.position = "top", text = element_text(size = 14))
+# Pred_eval_df |>
+#   filter(model_class == "Ensemble", Horizon %in% c(1, 15, 30)) |>
+#   filter(!is.na(fDOM_1m_predicted), !is.na(fDOM_1m_obs)) |>
+#   mutate(abs_error = abs(fDOM_1m_predicted - fDOM_1m_obs),
+#          Horizon   = factor(Horizon, levels = c(1, 15, 30))) |>
+#   ggplot(aes(x = forecast_date, y = abs_error, color = model_vars)) +
+#   geom_line(linewidth = 0.7) +
+#   facet_wrap(~Horizon, ncol = 1, scales = "free_y") +
+#   scale_x_date(date_breaks = "2 months", date_labels = "%b")+
+#   scale_color_manual(values = model_vars_colors)+
+#   labs(x = "Date", y = "Absolute Error (QSU)", color = "Horizon (days)",
+#        title = "Ensemble absolute error over time, 1/15/30-day horizons") +
+#   theme_bw() +
+#   theme(legend.position = "top", text = element_text(size = 14))
 
 ```
 
@@ -299,10 +336,11 @@ strat <- read_csv("../Data/Daily_catwalk_RH_2021_2026.csv") |>
 ## labels
 rmse_labels <- data.frame(
   Strat = "Mixed",
-  x     = c(Inf, Inf),
+  x     = c(-Inf, -Inf),
   y     = c(Inf, -Inf),
   label = c("Less accurate", "More accurate"),
-  vjust = c(1.5, -0.5)
+  vjust = c(1.5, -0.5),
+  hjust = c(-0.3, -0.3)
 )
 
 skill_labels <- data.frame(
@@ -340,9 +378,9 @@ rmse_STRAT <- metrics_eval_STRAT |>
   scale_color_manual(values = model_vars_colors) +
   # ylim(0.5, 3.2)+
   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
-  geom_text(data = rmse_labels, aes(x = x, y = y, label = label, vjust = vjust),
-          hjust = 1.1, size = 4, fontface = "italic", color = "grey40", inherit.aes = FALSE)+
-  theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
+geom_text(data = rmse_labels, aes(x = x, y = y, label = label, vjust = vjust, hjust = hjust),
+          size = 4, fontface = "italic", color = "grey40", inherit.aes = FALSE)+
+  theme_bw() + theme(legend.position = "top", text = element_text(size = 16))
 
 rmse_STRAT
 
@@ -358,7 +396,7 @@ skill_STRAT <- metrics_eval_STRAT |>
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   scale_color_manual(values = model_vars_colors)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
-  geom_text(data = skill_labels, aes(x = x, y = y, label = label, vjust = vjust),
+  geom_text(data = skill_labels, aes(x = 15, y = y, label = label, vjust = vjust),
           hjust = 1.1, size = 4, fontface = "italic", color = "grey40", inherit.aes = FALSE)+
   theme_bw() +
   theme(legend.position = "top", text = element_text(size = 18))
@@ -372,6 +410,8 @@ rmse_STRAT | skill_STRAT
 # ##plotly figures
 # plotly::ggplotly(rmse_STRAT)
 # plotly::ggplotly(skill_STRAT)
+
+
 
 ```
 
@@ -418,7 +458,7 @@ flowrmse2 <- DryWet2_ens |>
   facet_wrap(~flow_class) +
   labs(x = "Prediction Horizon (days)", y = "RMSE (QSU)", color = NULL) +
   scale_color_manual(values = model_vars_colors)+
-  theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
+  theme_bw() +  theme(legend.position = "top", text = element_text(size = 16))
 
 
 flowrmse2
@@ -500,7 +540,7 @@ highvar_rmse <- rmse_HighVar |>
   facet_wrap(~HighVar) +
   labs(x = "Prediction Horizon (days)", y = "RMSE (QSU)", color = NULL) +
   scale_color_manual(values = model_vars_colors)+
-  theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
+  theme_bw() +  theme(legend.position = "top", text = element_text(size = 16))
 
 highvar_rmse
 
@@ -524,12 +564,25 @@ highvar_skill <- skill_HighVar |>
   geom_line(linewidth = 1.5) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
   facet_wrap(~HighVar) +
-  ylim(-1,0.5)+
+  ylim(-0.6,0.5)+
   labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
   scale_color_manual(values = model_vars_colors)+
   theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
 
 highvar_skill
+
+
+## Second version of highvar_skill with no y-axis limits set (full autoscale)
+highvar_skill_full <- skill_HighVar |>
+  ggplot(aes(x = Horizon, y = Skill, color = model_vars)) +
+  geom_line(linewidth = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1.5) +
+  facet_wrap(~HighVar) +
+  labs(x = "Prediction Horizon (days)", y = "Skill", color = NULL) +
+  scale_color_manual(values = model_vars_colors) +
+  theme_bw() +  theme(legend.position = "top", text = element_text(size = 18))
+
+highvar_skill_full
 
 
 ##plot both
@@ -538,7 +591,7 @@ highvar_rmse / highvar_skill
 
 ##plotly figures
 # plotly::ggplotly(highvar_rmse)
-# plotly::ggplotly(highvar_skill)
+plotly::ggplotly(highvar_skill)
 
 ```
 
@@ -568,6 +621,8 @@ ggpubr::annotate_figure(skill_group_fig,
   bottom = ggpubr::text_grob("Prediction Horizon (days)", size = 18)
 )
 
+ggsave("../Figures/Skill_seasons.png", width = 7, height = 7, units = "in")
+
 ```
 
 
@@ -587,240 +642,273 @@ rmse_group_fig <- ggpubr::ggarrange(
 )
 
 ggpubr::annotate_figure(rmse_group_fig,
-  bottom = ggpubr::text_grob("Prediction Horizon (days)", size = 18)
+  bottom = ggpubr::text_grob("Prediction Horizon (days)", size = 16)
 )
+
+ggsave("../Figures/RMSE_seasons.png", width = 7, height = 7, units = "in")
+
 
 ```
 
 
 
-### Forecast visualisation: `plot_forecast()`
 
-Plots observed history leading up to `forecast_date`, model prediction lines + points
-for each requested model, and (optionally) observed values during the forecast window.
 
-**Arguments:**
-- `forecast_date` — the reference date the forecast was issued from
-- `models` — character vector of `model_id` values to include
-- `Pred_eval_df` — the joined prediction + observation dataframe
-- `obs_df` — observed timeseries (`eval` in this script; needs `Date` + `fDOM_1m_obs`)
-- `history_days` — how many days of pre-forecast observed history to show (default 60)
-- `show_horizon_obs` — if `TRUE` (default), overlays observed fDOM during the forecast
-  window as open black circles; set to `FALSE` to hide them
 
-```{r fn-plot-forecast}
-plot_forecast <- function(forecast_date,
-                          models,
-                          Pred_eval_df,
-                          obs_df,
-                          history_days     = 3,
-                          show_horizon_obs = TRUE,
-                          colors           = NULL) {
+
+#############################################################################################
+### Forecast visualisation
+
+
+### Ensemble uncertainty: `plot_forecast_uncertainty()`
+
+Shows a single driver group's ensemble forecast as a mean line with a shaded band.
+The band is the min/max range across the 4 underlying model structures (AR, ARIMA,
+NNETAR, XGB) that get averaged into the ensemble for that driver group at each
+forecast date -- this is calculated here rather than stored anywhere, since
+`Pred_eval_df` only carries the individual model rows plus the already-averaged
+`Ensemble_*` rows, not the spread across structures.
+
+```{r fn-plot-forecast-uncertainty}
+plot_forecast_uncertainty <- function(forecast_date,
+                                       Pred_eval_df,
+                                       obs_df,
+                                       model_vars_groups = c("WaterColumn", "Catchment", "WaterColumn+Catchment"),
+                                       model_classes      = c("AR", "ARIMA", "NNETAR", "XGB"),
+                                       history_days       = 3,
+                                       show_horizon_obs   = TRUE,
+                                       show_title         = TRUE,
+                                       colors             = NULL,
+                                       y_limits           = NULL) {
 
   ref_date <- as.Date(forecast_date)
 
-  # Observed history: history_days before forecast_date through forecast_date
   history_obs <- obs_df |>
     filter(Date >= ref_date - history_days,
            Date <= ref_date)
 
-  # Model predictions for this reference date and selected models
-  fc_preds <- Pred_eval_df |>
+  # Individual model-structure predictions feeding each driver group's ensemble
+  structure_preds <- Pred_eval_df |>
     filter(reference_date == ref_date,
-           model_id %in% models) |>
-    select(model_id, fc_date = forecast_date, Horizon, fDOM_1m_predicted, fDOM_1m_obs)
+           model_class %in% model_classes,
+           model_vars %in% model_vars_groups) |>
+    select(model_class, model_vars, fc_date = forecast_date, Horizon, fDOM_1m_predicted, fDOM_1m_obs)
 
-  if (nrow(fc_preds) == 0) {
+  if (nrow(structure_preds) == 0) {
     warning("No forecast rows found for reference_date = ", ref_date,
-            " and the requested models.")
+            " and the requested driver groups.")
     return(NULL)
   }
 
-  # Horizon observations — unique across models, for optional overlay
-  horizon_obs <- fc_preds |>
+  # Ensemble mean + min/max envelope across model structures, per driver group
+  ensemble_summary <- structure_preds |>
+    group_by(model_vars, fc_date, Horizon) |>
+    summarise(Ensemble_mean = mean(fDOM_1m_predicted, na.rm = TRUE),
+              Ensemble_min  = min(fDOM_1m_predicted, na.rm = TRUE),
+              Ensemble_max  = max(fDOM_1m_predicted, na.rm = TRUE),
+              .groups = "drop")
+
+  horizon_obs <- structure_preds |>
     distinct(fc_date, fDOM_1m_obs) |>
     filter(!is.na(fDOM_1m_obs))
 
   p <- ggplot() +
-    # Pre-forecast observed history
-     geom_point(data = history_obs,
-               aes(x = Date, y = fDOM_1m_obs),
+    geom_ribbon(data = ensemble_summary,
+                aes(x = fc_date, ymin = Ensemble_min, ymax = Ensemble_max, fill = model_vars),
+                alpha = 0.25, color = NA) +
+    geom_point(data = history_obs,
+               aes(x = Date, y = fDOM_1m_obs, shape = "Obs"),
                color = "black", size = 1.5) +
-    # Vertical dashed line marking the forecast start
-    geom_vline(xintercept = ref_date,
-               linetype = "dashed", linewidth = 0.8) +
-    # Model forecast lines + points
-    geom_line(data  = fc_preds,
-              aes(x = fc_date, y = fDOM_1m_predicted, color = model_id),
+    geom_vline(xintercept = ref_date, linetype = "dashed", linewidth = 0.8) +
+    geom_line(data = ensemble_summary,
+              aes(x = fc_date, y = Ensemble_mean, color = model_vars),
               linewidth = 1.2) +
-    # geom_point(data = fc_preds,
-    #            aes(x = fc_date, y = fDOM_1m_predicted, color = model_id),
-    #            size = 1.8) +
-    labs(title = paste0("30-day prediction issued ", ref_date),
-         x = "Date", y = "fDOM (QSU)", color = NULL) +
+    labs(title = if (show_title) paste0("30-day prediction issued ", ref_date) else NULL,
+         subtitle = if (show_title) "Shaded band = range across AR/ARIMA/NNETAR/XGB structures" else NULL,
+         x = "Date", y = "fDOM (QSU)", color = NULL, fill = NULL, shape = NULL) +
     theme_bw() +
-    theme(legend.position = "top", text = element_text(size = 13))
+    theme(legend.position = "top", legend.box = "vertical", text = element_text(size = 13)) +
+    guides(color = guide_legend(order = 1),
+           fill  = guide_legend(order = 1),
+           shape = guide_legend(order = 2))
 
-  # Optional: overlay observed values during the forecast horizon
   if (show_horizon_obs) {
     p <- p +
-      geom_point(data  = horizon_obs,
-                 aes(x = fc_date, y = fDOM_1m_obs),
-                 color = "black", shape = 21, fill = "white",
-                 size = 1.5, stroke = 1.2)
+      geom_point(data = horizon_obs,
+                 aes(x = fc_date, y = fDOM_1m_obs, shape = "Obs for Eval"),
+                 color = "black", fill = "white", size = 1.5, stroke = 1.2)
   }
 
-  # Optional: apply a named color scale
+  p <- p +
+    scale_shape_manual(values = c("Obs" = 16, "Obs for Eval" = 21),
+                        breaks = c("Obs", "Obs for Eval"))
+
+  # Same named vector (model_vars_colors) drives both the ribbon fill and the
+  # mean line color, so the two legends merge into one and match the scheme
+  # used everywhere else in this script
   if (!is.null(colors)) {
-    p <- p + scale_color_manual(values = colors)
+    p <- p + scale_color_manual(values = colors) + scale_fill_manual(values = colors)
   }
+
+  p <- p + coord_cartesian(ylim = y_limits)
 
   p
 }
 ```
 
-### Example usage
-
-```{r plot-forecast-example}
-
-models_ensemble_persist <- c("Ensemble_lag_lake", "Ensemble_lag_catchment",
-                             "Ensemble_lag_lake_catchment", "Persistence")
-
-models_AR_persist <- c("AR_lag_lake", "AR_lag_catchment",
-                       "AR_lag_lake_catchment", "Persistence")
-
-# Derive model_id-keyed colors from model_vars_colors for ensemble + Persistence
-ensemble_colors <- c(
-  setNames(model_vars_colors, paste0("Ensemble_lag_", names(model_vars_colors))),
-  "Persistence" = "black"
+```{r plot-forecast-uncertainty-example}
+plot_forecast_uncertainty(
+  forecast_date     = "2024-09-01",
+  Pred_eval_df      = Pred_eval_df,
+  obs_df            = eval,
+  model_vars_groups = c("WaterColumn", "Catchment", "WaterColumn+Catchment"),
+  colors            = model_vars_colors
 )
-
-# All models for a single date
-plot_forecast(
-  forecast_date    = "2024-06-01",
-  models           = unique(Pred_eval_df$model_id),
-  Pred_eval_df     = Pred_eval_df,
-  obs_df           = eval,
-  history_days     = 3,
-  show_horizon_obs = TRUE
-)
-
-# Ensemble + Persistence with matched colors
-ex1 <- plot_forecast(
-  forecast_date    = "2024-06-01",
-  models           = models_ensemble_persist,
-  Pred_eval_df     = Pred_eval_df,
-  obs_df           = eval,
-  history_days     = 3,
-  show_horizon_obs = TRUE,
-  colors           = ensemble_colors
-)
-
-
-ex2 <- plot_forecast(
-  forecast_date    = "2025-02-01",
-  models           = models_ensemble_persist,
-  Pred_eval_df     = Pred_eval_df,
-  obs_df           = eval,
-  history_days     = 3,
-  show_horizon_obs = TRUE,
-  colors           = ensemble_colors
-)
-
-ex1 | ex2
-## Interesting dates: "2025-09-15";
-
 ```
 
 
----
+### Model structure comparison: `plot_forecast_structures()`
 
-## PDF: One plot per reference date
+Shows every model-structure line (AR/ARIMA/NNETAR/XGB) for one or more driver groups on
+the same panel: color encodes the driver group (`model_vars`), line type encodes the
+model structure (`model_class`).
 
-```{r fn-save-forecast-pdf}
-save_forecast_pdf <- function(Pred_eval_df,
-                               models,
-                               output_path  = "../Output/forecast_all_dates.pdf",
-                               plots_per_page = 12,
-                               ncol           = 3,
-                               width          = 16, height = 20) {
+```{r fn-plot-forecast-structures}
+plot_forecast_structures <- function(forecast_date,
+                                      Pred_eval_df,
+                                      obs_df,
+                                      model_vars_groups = c("WaterColumn", "Catchment", "WaterColumn+Catchment"),
+                                      model_classes      = c("AR", "ARIMA", "NNETAR", "XGB"),
+                                      history_days       = 3,
+                                      show_horizon_obs   = TRUE,
+                                      show_title         = TRUE,
+                                      show_color_legend  = TRUE,
+                                      colors             = NULL,
+                                      y_limits           = NULL) {
 
-  ref_dates <- Pred_eval_df |>
-    filter(model_id %in% models) |>
-    pull(reference_date) |>
-    unique() |>
-    sort()
+  ref_date <- as.Date(forecast_date)
 
-  # Build one ggplot per reference date
-  plot_list <- lapply(ref_dates, function(d) {
-    d <- as.Date(d)
+  history_obs <- obs_df |>
+    filter(Date >= ref_date - history_days,
+           Date <= ref_date)
 
-    plot_df <- Pred_eval_df |>
-      filter(reference_date == d, model_id %in% models)
+  fc_preds <- Pred_eval_df |>
+    filter(reference_date == ref_date,
+           model_class %in% model_classes,
+           model_vars %in% model_vars_groups) |>
+    select(model_class, model_vars, fc_date = forecast_date, Horizon, fDOM_1m_predicted, fDOM_1m_obs) |>
+    mutate(model_class = recode(model_class, "NNETAR" = "NNAR"))
 
-    obs_df <- plot_df |>
-      distinct(forecast_date, fDOM_1m_obs) |>
-      filter(!is.na(fDOM_1m_obs))
-
-    ggplot() +
-      geom_line(data  = plot_df,
-                aes(x = forecast_date, y = fDOM_1m_predicted, color = model_id),
-                linewidth = 0.7) +
-      geom_point(data = plot_df,
-                 aes(x = forecast_date, y = fDOM_1m_predicted, color = model_id),
-                 size = 1.2) +
-      geom_point(data  = obs_df,
-                 aes(x = forecast_date, y = fDOM_1m_obs),
-                 color = "black", size = 1.8) +
-      ylim(1,22) +
-      labs(title = format(d, "%b %d %Y"), x = NULL, y = "fDOM (QSU)", color = NULL) +
-      theme_bw() +
-      theme(legend.position  = "top",
-            legend.text      = element_text(size = 6),
-            legend.key.size  = unit(0.4, "cm"),
-            axis.text.x      = element_text(angle = 30, hjust = 1, size = 7),
-            axis.text.y      = element_text(size = 7),
-            plot.title       = element_text(size = 8),
-            axis.title.y     = element_text(size = 8))
-  })
-
-  # Split into pages of plots_per_page and print each page
-  pages <- split(plot_list, ceiling(seq_along(plot_list) / plots_per_page))
-
-  pdf(output_path, width = width, height = height)
-
-  for (pg in pages) {
-    print(wrap_plots(pg, ncol = ncol, guides = "collect") &
-            theme(legend.position = "top"))
+  if (nrow(fc_preds) == 0) {
+    warning("No forecast rows found for reference_date = ", ref_date,
+            " and the requested driver groups.")
+    return(NULL)
   }
 
-  dev.off()
-  cat("PDF saved to:", output_path, "\n")
+  horizon_obs <- fc_preds |>
+    distinct(fc_date, fDOM_1m_obs) |>
+    filter(!is.na(fDOM_1m_obs))
+
+  p <- ggplot() +
+    geom_point(data = history_obs,
+               aes(x = Date, y = fDOM_1m_obs, shape = "Obs"),
+               color = "black", size = 1.5) +
+    geom_vline(xintercept = ref_date, linetype = "dashed", linewidth = 0.8) +
+    geom_line(data = fc_preds,
+              aes(x = fc_date, y = fDOM_1m_predicted, color = model_vars, linetype = model_class),
+              linewidth = 1) +
+    labs(title = if (show_title) paste0("30-day prediction issued ", ref_date) else NULL,
+         subtitle = if (show_title) "Color = driver set, line type = model structure" else NULL,
+         x = "Date", y = "fDOM (QSU)", color = NULL, linetype = NULL, shape = NULL) +
+    theme_bw() +
+    theme(legend.position = "top", legend.box = "vertical", text = element_text(size = 13))
+
+  if (show_color_legend) {
+    p <- p + guides(color = guide_legend(order = 1),
+                     linetype = guide_legend(order = 2),
+                     shape = guide_legend(order = 3))
+  } else {
+    p <- p + guides(color = "none",
+                     linetype = guide_legend(order = 1),
+                     shape = guide_legend(order = 2))
+  }
+
+  if (show_horizon_obs) {
+    p <- p +
+      geom_point(data = horizon_obs,
+                 aes(x = fc_date, y = fDOM_1m_obs, shape = "Obs for Eval"),
+                 color = "black", fill = "white", size = 1.5, stroke = 1.2)
+  }
+
+  p <- p +
+    scale_shape_manual(values = c("Obs" = 16, "Obs for Eval" = 21),
+                        breaks = c("Obs", "Obs for Eval"))
+
+  if (!is.null(colors)) {
+    p <- p + scale_color_manual(values = colors)
+  }
+
+  p <- p + coord_cartesian(ylim = y_limits)
+
+  p
 }
 ```
 
-```{r save-pdf}
+```{r plot-forecast-structures-example}
+plot_forecast_structures(
+  forecast_date = "2024-09-01",
+  Pred_eval_df  = Pred_eval_df,
+  obs_df        = eval,
+  colors        = model_vars_colors
+)
 
-models_ensemble_persist <- c("Ensemble_lag_lake", "Ensemble_lag_catchment", 
-                             "Ensemble_lag_lake_catchment", "Persistence")
-
-save_forecast_pdf(
-  Pred_eval_df = Pred_eval_df,
-  models       = models_ensemble_persist, #unique(Pred_eval_df$model_id),
-  output_path  = "../Data/forecast_all_dates3.pdf"
+# Single driver group: linetype alone distinguishes the 4 model structures
+plot_forecast_structures(
+  forecast_date     = "2024-09-01",
+  Pred_eval_df      = Pred_eval_df,
+  obs_df            = eval,
+  model_vars_groups = "WaterColumn",
+  colors            = model_vars_colors
 )
 ```
 
+### Uncertainty + structures, side by side
 
+No titles, shared/collected legend so both panels come out the same size and the
+legend rows line up at the same height.
 
+```{r plot-forecast-uncertainty-structures-combined}
+p_uncertainty <- plot_forecast_uncertainty(
+  forecast_date     = "2024-09-01",
+  Pred_eval_df      = Pred_eval_df,
+  obs_df            = eval,
+  model_vars_groups = c("WaterColumn", "Catchment", "WaterColumn+Catchment"),
+  colors            = model_vars_colors,
+  show_title        = FALSE
+)
 
+p_structures <- plot_forecast_structures(
+  forecast_date      = "2024-09-01",
+  Pred_eval_df       = Pred_eval_df,
+  obs_df             = eval,
+  colors             = model_vars_colors,
+  model_vars_groups  = "Catchment",
+  show_title         = FALSE,
+  show_color_legend  = FALSE
+)
 
+# match y-axis range across both panels
+y_range <- range(c(layer_scales(p_uncertainty)$y$range$range,
+                    layer_scales(p_structures)$y$range$range))
 
+p_uncertainty <- p_uncertainty + coord_cartesian(ylim = y_range)
+p_structures  <- p_structures  + coord_cartesian(ylim = y_range)
 
-
-
-
-
+(p_structures | p_uncertainty) +
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "a", tag_suffix = ")") &
+  theme(legend.position = "top", legend.box = "vertical")
+```
 
 
 
