@@ -73,6 +73,7 @@ write.csv(daily_fdom, "./Dissertation_Synthesis/Daily_fDOM_data.csv", row.names 
 
 #fdom
 daily_fdom <- read.csv("./Dissertation_Synthesis/Daily_fDOM_data.csv") |>
+  select(-fDOM_9_QSU_daily ) |>
   mutate(Date = as.Date(Date),
     Year  = year(Date),
     Month = month(Date),
@@ -87,253 +88,23 @@ daily_fdom <- read.csv("./Dissertation_Synthesis/Daily_fDOM_data.csv") |>
   filter(Year > 2021)
 
 
-#metab
-# daily_fcr_metab <- read.csv("https://raw.githubusercontent.com/dwh77/FCR_Metab/refs/heads/main/Data/Model_Output/MetabOutput_QAQC_15_22.csv") |>
-#   select(solarDay, GPP_QAQC, R_QAQC, NEM_QAQC) |>
-#   mutate(R_QAQC = -R_QAQC,          #set R rates to negative
-#          solarDay = ymd(solarDay)) |>
-#   rename(Date = solarDay) |>
-#   mutate(
-#     Year  = year(Date),
-#     Month = month(Date),
-#     Season = case_when(
-#       Month %in% c(12, 1, 2) ~ "Winter",
-#       Month %in% c(3, 4, 5)  ~ "Spring",
-#       Month %in% c(6, 7, 8)  ~ "Summer",
-#       Month %in% c(9, 10, 11) ~ "Fall"
-#     ),
-#     Season = factor(Season, levels = c("Winter", "Spring", "Summer", "Fall"))
-#   )
 
-
-
-#### Seasons and year variability -------------------------------
-library(gt)
-
-
-##fDOM by reservoir plot
+## summary stats by reservoir
 daily_fdom |>
-  ggplot(aes(x = Date, y = fDOM_1_QSU_daily))+
-  geom_point()+
-  facet_wrap(~Site, ncol = 1)+
-  theme_bw()
-
-# ---- Helper to compute summary stats ----
-summarize_fdom <- function(df, ...) {
-  df %>%
-    group_by(...) %>%
-    summarise(
-      Mean   = mean(fDOM_1_QSU_daily, na.rm = TRUE),
-      Median = median(fDOM_1_QSU_daily, na.rm = TRUE),
-      Max    = max(fDOM_1_QSU_daily, na.rm = TRUE),
-      Min    = min(fDOM_1_QSU_daily, na.rm = TRUE),
-      SD     = sd(fDOM_1_QSU_daily, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Range = paste0(round(Min, 1), " - ", round(Max, 1)),
-      CV    = round(SD / Mean, 2) * 100,
-      Mean   = round(Mean, 2),
-      Median = round(Median, 2)
-    ) %>%
-    select(-Max, -Min, -SD)
-}
-
-# ---- Table 1: by Site x Season (across all years) ----
-season_table <- summarize_fdom(daily_fdom, Site, Season)
-
-# ---- Table 2: by Site x Year ----
-year_table <- summarize_fdom(daily_fdom, Site, Year)
-
-# ---- Nice gt tables ----
-season_gt <- season_table %>%
-  arrange(Site, Season) %>%
-  gt(groupname_col = "Site") %>%
-  tab_header(title = "fDOM Summary by Site and Season") %>%
-  cols_label(
-    Season = "Season",
-    Mean = "Mean",
-    Median = "Median",
-    Range = "Range (Max - Min)",
-    CV = "CV"
-  ) %>%
-  fmt_number(columns = c(Mean, Median, CV), decimals = 1)
-
-year_gt <- year_table %>%
-  arrange(Site, Year) %>%
-  gt(groupname_col = "Site") %>%
-  tab_header(title = "fDOM Summary by Site and Year") %>%
-  cols_label(
-    Year = "Year",
-    Mean = "Mean",
-    Median = "Median",
-    Range = "Range (Max - Min)",
-    CV = "CV"
-  ) %>%
-  fmt_number(columns = c(Mean, Median, CV), decimals = 1)
-
-season_gt
-year_gt
-
-
-## diff across season
-season_table |>
   group_by(Site) |>
-  summarize(range_median = max(Median) - min(Median))
-
-
-year_table |>
-  group_by(Site) |>
-  summarize(range_median = max(Median) - min(Median))
-
-
-
-#### Boxplots of CV by Year and Season, across reservoirs -------------------------------
-
-# ---- CV per Site x Year x Season (gives a distribution of CV across years for each season) ----
-season_year_table <- summarize_fdom(daily_fdom, Site, Year, Season)
-
-# ---- Long-format df: one CV value per Site x Year, tagged by Group (Year or Season) ----
-cv_boxplot_df <- bind_rows(
-  year_table |>
-    select(Site, Year, CV) |>
-    mutate(Group = "Full Year"),
-  season_year_table |>
-    select(Site, Year, Season, CV) |>
-    mutate(Group = as.character(Season))
-) |>
-  mutate(Group = factor(Group, levels = c("Full Year", "Spring", "Summer", "Fall", "Winter")))
-
-# ---- Boxplot: CV by Year/Season grouping, one box per reservoir within each group ----
-# points are jittered within each box's dodge position and shaped by Year
-# (8 years in the record, so shapes are set manually since ggplot's default
-# discrete shape scale only supports 6 before it starts dropping points)
-# point colour is mapped to Site (shapes 0-7 have no fill, so fill alone
-# doesn't distinguish points) using the same palette as the box fill so the
-# two legends merge into one "Reservoir" key
-site_colors <- c(BVR = "orange", CCR = "skyblue", FCR = "#009E73")
-
-aaa <- cv_boxplot_df |>
-  ggplot(aes(x = Group, y = CV, fill = Site)) +
-  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
-  geom_point(
-    aes(shape = factor(Year), group = Site),
-    colour = "black",
-    position = position_jitterdodge(jitter.width = 0.1, jitter.height = 0, dodge.width = 0.75),
-    size = 2
-  ) +
-  ylim(0,40)+
-  scale_shape_manual(values = 15:18) +
-  scale_fill_manual(values = site_colors) +
-  labs(x = NULL, y = "CV (%)", fill = "Reservoir", shape = "Year") +
-  theme_bw()
-
-aaa
-
-#### Boxplots of CV by Full Record vs individual Year, across reservoirs ---------------
-
-# ---- Long-format df: one CV value per Site x Season, tagged by Group2 ----
-# "All Years" uses season_table (CV pooled across the whole record, one point
-# per season); each year column uses season_year_table filtered to that year
-# (one point per season within that year). Update the year labels below if
-# the filtered date range in daily_fdom changes.
-cv_boxplot_by_year_df <- bind_rows(
-  season_table |>
-    select(Site, Season, CV) |>
-    mutate(Group2 = "All Years"),
-  season_year_table |>
-    mutate(Group2 = sprintf("%02d", Year %% 100)) |>
-    select(Site, Season, CV, Group2)
-) |>
-  mutate(Group2 = factor(Group2, levels = c("All Years", "22", "23", "24", "25")))
-
-# ---- Boxplot: CV by Full-record/Year grouping, one box per reservoir within each group ----
-# points are the season CVs within that grouping, shaped by Season, dodged to
-# line up with each reservoir's box (group = Site keeps the dodge to 3 slots
-# instead of splitting further by Season)
-bbb <- cv_boxplot_by_year_df |>
-  ggplot(aes(x = Group2, y = CV, fill = Site)) +
-  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
-  geom_point(
-    aes(shape = Season, group = Site),
-    colour = "black",
-    position = position_jitterdodge(jitter.width = 0.1, jitter.height = 0, dodge.width = 0.75),
-    size = 2
-  ) +
-  ylim(0,40)+
-  scale_shape_manual(values = 15:18) +
-  scale_fill_manual(values = site_colors) +
-  labs(x = NULL, y = "CV (%)", fill = "Reservoir", shape = "Season") +
-  theme_bw()
-
-bbb
-
-
-aaa | bbb
-
-
-#### CV (%) by Site and Year/Season grouping, pooled across 2022-2025 -----------------
-
-# ---- Full-record CV per Site (all days, all years pooled, i.e. "Full Year") ----
-overall_table <- summarize_fdom(daily_fdom, Site) |>
-  mutate(Group = "Full Year")
-
-# ---- Combine with season_table's pooled Site x Season CV ----
-cv_point_df <- bind_rows(
-  overall_table |> select(Site, Group, CV, Mean),
-  season_table |> mutate(Group = as.character(Season)) |> select(Site, Group, CV, Mean)
-) |>
-  mutate(Group = factor(Group, levels = c("Full Year", "Spring", "Summer", "Fall", "Winter")))
-
-# ---- Plot: one point per Site x Group, CV (%) mapped to point size ----
-cv_point_df |>
-  ggplot(aes(x = Group, y = Site, size = CV)) +
-  geom_point() +
-  scale_size(range = c(3, 14)) +
-  labs(x = NULL, y = NULL, size = "CV (%)") +
-  theme_bw()
-
-## CV by size and color
-cv_point_df |>
-  ggplot(aes(x = Group, y = Site, fill = CV, size = CV)) +
-  geom_point(shape = 21) +
-  scale_size(range = c(3, 14)) +
-  # scale_size(range = c(3, 14), breaks = c(10, 20, 30), limits = c(0, 40)) +
-  labs(x = NULL, y = NULL, size = "CV (%)", color = "CV (%)") +
-  #scale_color_viridis_c()+
-  scale_fill_distiller(palette = "Blues", direction = 1)+
-  theme_bw()
-
-
-cv_point_df |>
-  ggplot(aes(x = Group, y = CV, fill = Site)) +
-  geom_jitter(shape = 21, size = 5, width = 0.2) +
-  labs(x = "Time Frame", y = "CV (%)")+
-  scale_fill_manual(values = site_colors) +
-  theme_bw()
-
-
-## mean by color and size
-cv_point_df |>
-  ggplot(aes(x = Group, y = Site, fill = Mean, size = CV)) +
-  geom_point(shape = 21) +
-  scale_size(range = c(5, 20)) +
-  scale_size(range = c(3, 14), breaks = c(10, 20, 30), limits = c(10, 40)) +
-  labs(x = NULL, y = NULL, size = "CV (%)", color = "CV (%)") +
-  #scale_color_viridis_c()+
-  scale_fill_distiller(palette = "RdYlGn", direction = -1)+
-  theme_bw()
+  summarise(min = min(fDOM_1_QSU_daily, na.rm = T),
+            mean = mean(fDOM_1_QSU_daily, na.rm = T),
+            median = median(fDOM_1_QSU_daily, na.rm = T),
+            max = max(fDOM_1_QSU_daily, na.rm = T),
+            sd = sd(fDOM_1_QSU_daily, na.rm = T)) |>
+  mutate(CV = round(sd / mean, 2) * 100 )
 
 
 
 
 
 
-
-
-
-
-
+####################################################################################################
 #### Raw daily fDOM boxplots by Year and Season, faceted by reservoir -----------------
 library(patchwork)
 library(FSA)         # dunnTest()
@@ -416,51 +187,83 @@ wrap_plots(fdom_by_year_plot, fdom_by_season_plot, ncol = 1) +
   theme(plot.tag = element_text(size = 14, face = "bold"))
 
 
-#### Summary table: Inter- vs Intra-annual variability by reservoir --------------------
 
-# ---- Inter-annual: mean (and range) of each site's yearly means ----
-inter_summary <- year_table |>
-  group_by(Site) |>
-  summarise(
-    Inter_mean  = round(mean(Mean, na.rm = TRUE), 2),
-    Inter_range = paste0(round(min(Mean, na.rm = TRUE), 2), " - ", round(max(Mean, na.rm = TRUE), 2)),
-    .groups = "drop"
+
+####################################################################################################
+#### Intra vs Inter CV variability -------------------------------
+
+# ---- Helper to compute CV ----
+summarize_fdom <- function(df, ...) {
+  df %>%
+    group_by(...) %>%
+    summarise(
+      Mean = mean(fDOM_1_QSU_daily, na.rm = TRUE),
+      SD   = sd(fDOM_1_QSU_daily, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(CV = round(SD / Mean, 2) * 100)
+}
+
+# ---- Table 1: by Site x Season (across all years) ----
+season_table <- summarize_fdom(daily_fdom, Site, Season)
+
+# ---- Table 2: by Site x Year ----
+year_table <- summarize_fdom(daily_fdom, Site, Year)
+
+site_colors <- c(BVR = "orange", CCR = "skyblue", FCR = "#009E73")
+
+
+#### Intra vs Inter CV, faceted by reservoir (sensu Whitney space/time boxplots) -------
+
+# ---- Intra: the 4 season CVs (season_table), Label = Season; Inter: the 4 year CVs
+# (year_table), Label = Year. Combined into one 8-level shape scale (solid shapes for
+# the 4 seasons, hollow shapes for the 4 years) so both point types share one legend ----
+intra_inter_df <- bind_rows(
+  season_table |> mutate(Group = "Intra", Label = as.character(Season)) |> select(Site, CV, Group, Label),
+  year_table   |> mutate(Group = "Inter", Label = as.character(Year))   |> select(Site, CV, Group, Label)
+) |>
+  mutate(
+    Group = factor(Group, levels = c("Intra", "Inter")),
+    Label = factor(Label, levels = c("Winter", "Spring", "Summer", "Fall", "2022", "2023", "2024", "2025"))
   )
 
-# ---- Intra-annual: mean (and range) of each site's seasonal means ----
-intra_summary <- season_table |>
-  group_by(Site) |>
-  summarise(
-    Intra_mean  = round(mean(Mean, na.rm = TRUE), 2),
-    Intra_range = paste0(round(min(Mean, na.rm = TRUE), 2), " - ", round(max(Mean, na.rm = TRUE), 2)),
-    .groups = "drop"
+# ---- Values going into each box, and the mean CV per Site x Group (for reporting) ----
+intra_inter_df |> arrange(Site, Group, Label)
+
+intra_inter_means <- intra_inter_df |>
+  group_by(Site, Group) |>
+  summarise(Mean_CV = round(mean(CV), 2), n = n(), .groups = "drop")
+
+intra_inter_means
+
+# ---- t-test (Intra vs Inter) within each reservoir ----
+ttest_by_site <- do.call(rbind, lapply(split(intra_inter_df, intra_inter_df$Site), function(sub) {
+  p <- t.test(CV ~ Group, data = sub)$p.value
+  data.frame(
+    Site  = unique(sub$Site),
+    p_val = p,
+    label = paste0("t-test p ", if (p < 0.001) "< 0.001" else paste0("= ", round(p, 3)))
   )
+}))
 
-variability_summary_table <- inter_summary |>
-  left_join(intra_summary, by = "Site") |>
-  mutate(Site = factor(Site, levels = c("FCR", "BVR", "CCR"))) |>
-  arrange(Site)
+ttest_by_site
 
-variability_summary_gt <- variability_summary_table |>
-  gt() |>
-  tab_header(title = "Inter- vs Intra-annual fDOM Variability by Reservoir") |>
-  cols_label(
-    Site = "Reservoir",
-    Inter_mean = "Inter-annual Mean",
-    Inter_range = "Inter-annual Range",
-    Intra_mean = "Intra-annual Mean",
-    Intra_range = "Intra-annual Range"
-  )
-
-variability_summary_gt
-
-
-
-
-
-
-
-
-
-
-
+# ---- Plot ----
+intra_inter_df |>
+  ggplot(aes(x = Group, y = CV, fill = Site)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(
+    aes(shape = Label),
+    colour = "black",
+    position = position_jitter(width = 0.15, height = 0),
+    size = 5
+  ) +
+  stat_summary(fun = mean, geom = "point", shape = 4, colour = "red", size = 5, stroke = 1.5) +
+  geom_text(data = ttest_by_site, aes(x = 1.5, y = -Inf, label = label),
+            inherit.aes = FALSE, vjust = -0.5, size = 5) +
+  facet_wrap(~Site, nrow = 1) +
+  scale_shape_manual(values = c(15, 16, 17, 18, 0, 1, 2, 5)) +
+  scale_fill_manual(values = site_colors) +
+  guides(fill = "none") +
+  labs(x = NULL, y = "CV (%)", shape = "Season / Year") +
+  theme_bw()+ theme(legend.position = "top", text = element_text(size = 24))
