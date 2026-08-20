@@ -424,7 +424,7 @@ get tinker data and join
 
 ```{r}
 #change change flow class to be flow_class_usgs to use just the USGS data based classifications
-flow_flags <- read_csv("../Data/HPB_USGS_Flows.csv") |> 
+flow_flags <- read_csv("../Data/HPB_USGS_Flows2.csv") |> 
    select(Date, flow_class = flow_class_hpb) 
 
 
@@ -591,7 +591,7 @@ highvar_rmse / highvar_skill
 
 ##plotly figures
 # plotly::ggplotly(highvar_rmse)
-plotly::ggplotly(highvar_skill)
+# plotly::ggplotly(highvar_skill)
 
 ```
 
@@ -823,13 +823,27 @@ plot_forecast_structures <- function(forecast_date,
     theme_bw() +
     theme(legend.position = "top", legend.box = "vertical", text = element_text(size = 13))
 
+  # Explicit dash patterns. The built-in "dotted"/"dotdash" presets use a
+  # 1-unit minimum dash segment, which some graphics devices (notably
+  # Windows' default GDI-based PNG device) round away entirely, making the
+  # line look solid -- custom patterns with a bigger minimum unit render
+  # reliably distinct across devices
+  p <- p + scale_linetype_manual(values = c("AR" = "solid", "ARIMA" = "44",
+                                             "NNAR" = "23", "XGB" = "2353"))
+
+  # At linewidth = 1, the dash/dot pattern's gaps are so small relative to the
+  # dot size that dotted/dotdash read as solid in the legend key -- override
+  # just the key glyph's linewidth (thinner) so the pattern stays legible;
+  # the actual plotted lines are unaffected
   if (show_color_legend) {
     p <- p + guides(color = guide_legend(order = 1),
-                     linetype = guide_legend(order = 2),
+                     linetype = guide_legend(order = 2, keywidth = unit(1.4, "cm"),
+                                              override.aes = list(linewidth = 0.6)),
                      shape = guide_legend(order = 3))
   } else {
     p <- p + guides(color = "none",
-                     linetype = guide_legend(order = 1),
+                     linetype = guide_legend(order = 1, keywidth = unit(1.4, "cm"),
+                                              override.aes = list(linewidth = 0.6)),
                      shape = guide_legend(order = 2))
   }
 
@@ -907,7 +921,16 @@ p_structures  <- p_structures  + coord_cartesian(ylim = y_range)
 (p_structures | p_uncertainty) +
   plot_layout(guides = "collect") +
   plot_annotation(tag_levels = "a", tag_suffix = ")") &
-  theme(legend.position = "top", legend.box = "vertical")
+  theme(legend.position = "top", legend.box = "vertical",
+        legend.margin = margin(0, 0, 0, 0),
+        legend.box.margin = margin(0, 0, 0, 0),
+        legend.box.spacing = unit(2, "pt"),
+        legend.spacing.y = unit(0, "pt"),
+        legend.key.size = unit(0.4, "cm"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10),
+        plot.margin = margin(2, 2, 2, 2),
+        plot.tag = element_text(size = 12, margin = margin(0, 4, 0, 0)))
 ```
 
 
