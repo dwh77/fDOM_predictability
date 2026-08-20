@@ -9,7 +9,7 @@ library(tidyverse)
 
 setwd("/workspace/Catchment_Modeling")
 
-output_folder <- "Run_model/out/ExampleRun"
+output_folder <- "Run_RHESSys/out/ExampleRun"
 dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 
 name <- "RHESSys_example_run"
@@ -19,14 +19,14 @@ name <- "RHESSys_example_run"
 dates <- c("2021 1 1 1", "2026 1 1 24")
 
 input_hdr <- IOin_hdr(
-  basin      = "Run_model/defs/basin.def",
-  hillslope  = "Run_model/defs/hill.def",
-  zone       = "Run_model/defs/zone.def",
-  soil       = c("Run_model/defs/soil_silt-loam.def", "Run_model/defs/soil_water.def"),
-  landuse    = "Run_model/defs/landuse_undeveloped.def",
-  stratum    = c("Run_model/defs/veg_deciduous.def", "Run_model/defs/veg_evergreen.def",
-                 "Run_model/defs/veg_deciduous_ID5.def", "Run_model/defs/veg_nonveg.def"),
-  basestations = "Run_model/clim/ccr_era5_1850_base"
+  basin      = "Run_RHESSys/defs/basin.def",
+  hillslope  = "Run_RHESSys/defs/hill.def",
+  zone       = "Run_RHESSys/defs/zone.def",
+  soil       = c("Run_RHESSys/defs/soil_silt-loam.def", "Run_RHESSys/defs/soil_water.def"),
+  landuse    = "Run_RHESSys/defs/landuse_undeveloped.def",
+  stratum    = c("Run_RHESSys/defs/veg_deciduous.def", "Run_RHESSys/defs/veg_evergreen.def",
+                 "Run_RHESSys/defs/veg_deciduous_ID5.def", "Run_RHESSys/defs/veg_nonveg.def"),
+  basestations = "Run_RHESSys/clim/ccr_era5_1850_base"
 )
 
 # builds a tec file that just turns on daily output; no restart state needed here
@@ -34,15 +34,15 @@ input_tec_data <- IOin_tec_std(start = dates[1], end = dates[2], output_state = 
 
 input_rhessys <- IOin_rhessys_input(
   version          = "RHESSys_exec/rhessys7.5",
-  tec_file         = paste0("Run_model/tecfiles/", name, ".tec"),
-  world_file       = "Run_model/worldfiles/transient/HarvestNone/ccr_mixed.world.Y2940M1D2H23.state.Y2026M4D2H23.state",
+  tec_file         = paste0("Run_RHESSys/tecfiles/", name, ".tec"),
+  world_file       = "Run_RHESSys/worldfiles/transient/HarvestNone/ccr_mixed.world.Y2940M1D2H23.state.Y2026M4D2H23.state",
   world_hdr_prefix = "ccr",
-  flowtable        = "Run_model/worldfiles/Generated/ccr_mixed.flow",
+  flowtable        = "Run_RHESSys/worldfiles/Generated/ccr_mixed.flow",
   start            = dates[1],
   end              = dates[2],
   output_folder    = output_folder,
   output_prefix    = name,
-  commandline_options = "-b -g -str Run_model/worldfiles/Generated/ccr_mixed.stream -stro"
+  commandline_options = "-b -g -str Run_RHESSys/worldfiles/Generated/ccr_mixed.stream -stro"
 )
 
 run_rhessys_single(

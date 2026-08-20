@@ -3,10 +3,10 @@ library(RHESSysIOinR)
 library(tidyverse)
 
 getwd()
-setwd("/workspace/ccr_rhessys_dwh/")
+setwd("/workspace/Catchment_Modeling")
 getwd()
 
-output_folder <- "out/ccrSPIN"
+output_folder <- "Run_RHESSys/out/ccrSPIN"
 dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 
 
@@ -20,24 +20,24 @@ dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 #
 # #header set up
 # input_hdr = IOin_hdr(
-#   basin      = "defs/basin.def",
-#   hillslope  = "defs/hill.def",
-#   zone       = "defs/zone.def",
-#   soil       = c("defs/soil_silt-loam.def", "defs/soil_water.def"),
-#   landuse    = "defs/landuse_undeveloped.def",
-#   stratum    = c("defs/veg_deciduous.def", "defs/veg_evergreen.def",
-#   "defs/veg_deciduous_ID5.def", "defs/veg_nonveg.def"),
-#   #basestations = "clim/ccr_base"
-#   basestations = "clim/ccr_era5_spinup_base"
+#   basin      = "Run_RHESSys/defs/basin.def",
+#   hillslope  = "Run_RHESSys/defs/hill.def",
+#   zone       = "Run_RHESSys/defs/zone.def",
+#   soil       = c("Run_RHESSys/defs/soil_silt-loam.def", "Run_RHESSys/defs/soil_water.def"),
+#   landuse    = "Run_RHESSys/defs/landuse_undeveloped.def",
+#   stratum    = c("Run_RHESSys/defs/veg_deciduous.def", "Run_RHESSys/defs/veg_evergreen.def",
+#   "Run_RHESSys/defs/veg_deciduous_ID5.def", "Run_RHESSys/defs/veg_nonveg.def"),
+#   #basestations = "Run_RHESSys/clim/ccr_base"
+#   basestations = "Run_RHESSys/clim/ccr_era5_spinup_base"
 # )
 #
 #
 # input_rhessys = IOin_rhessys_input(
-#   version          = "../RHESSys/rhessys/rhessys7.5",
-#   tec_file         =  paste0("tecfiles/",name,".tec"), #for using tecfile built below
-#   world_file       = "worldfiles/Generated/ccr_mixed.world", #what was made in pre-processing
+#   version          = "RHESSys_exec/rhessys7.5",
+#   tec_file         =  paste0("Run_RHESSys/tecfiles/",name,".tec"), #for using tecfile built below
+#   world_file       = "Run_RHESSys/worldfiles/Generated/ccr_mixed.world", #what was made in pre-processing
 #   world_hdr_prefix = "ccr",
-#   flowtable        = "worldfiles/Generated/ccr_mixed.flow", #what was made in pre-processing
+#   flowtable        = "Run_RHESSys/worldfiles/Generated/ccr_mixed.flow", #what was made in pre-processing
 #   start            = dates[1],
 #   end              = dates[2],
 #   output_folder    = output_folder,
@@ -65,7 +65,7 @@ dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 
 ###################################### TRANSIENT RUN WITH No harvest ######################################
 
-output_folder <- "out/ccrTR/HarvestNone"
+output_folder <- "Run_RHESSys/out/ccrTR/HarvestNone"
 dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 
 
@@ -78,14 +78,14 @@ name = "TR1850_2026_NOharvest_run"
 
 #header directly copied from hpb.hdr
 input_hdr = IOin_hdr(
-  basin      = "defs/basin.def",
-  hillslope  = "defs/hill.def",
-  zone       = "defs/zone.def",
-  soil       = c("defs/soil_silt-loam.def", "defs/soil_water.def"),
-  landuse    = "defs/landuse_undeveloped.def",
-  stratum    = c("defs/veg_deciduous.def", "defs/veg_evergreen.def",
-  "defs/veg_deciduous_ID5.def", "defs/veg_nonveg.def"),
-  basestations = "clim/ccr_era5_1850_base"
+  basin      = "Run_RHESSys/defs/basin.def",
+  hillslope  = "Run_RHESSys/defs/hill.def",
+  zone       = "Run_RHESSys/defs/zone.def",
+  soil       = c("Run_RHESSys/defs/soil_silt-loam.def", "Run_RHESSys/defs/soil_water.def"),
+  landuse    = "Run_RHESSys/defs/landuse_undeveloped.def",
+  stratum    = c("Run_RHESSys/defs/veg_deciduous.def", "Run_RHESSys/defs/veg_evergreen.def",
+  "Run_RHESSys/defs/veg_deciduous_ID5.def", "Run_RHESSys/defs/veg_nonveg.def"),
+  basestations = "Run_RHESSys/clim/ccr_era5_1850_base"
 )
 
 #NOTE: dwh not fully sure why but the output current state needs to be 1 hour less than the end date to get worldfile to write
@@ -95,19 +95,19 @@ input_tec_data = IOin_tec_all_options(print_daily_on = dates[1],
                                       #redefine_world_thin_harvest = "1946 7 1 1")
 
 input_rhessys = IOin_rhessys_input(
-  version          = "../RHESSys/rhessys/rhessys7.5",
-  tec_file         =  paste0("tecfiles/",name,".tec"), #for using tecfile built below
-  world_file       = "worldfiles/spin/ccr_mixed.world.Y2940M1D2H23.state", #state written by spinup above
+  version          = "RHESSys_exec/rhessys7.5",
+  tec_file         =  paste0("Run_RHESSys/tecfiles/",name,".tec"), #for using tecfile built below
+  world_file       = "Run_RHESSys/worldfiles/spin/ccr_mixed.world.Y2940M1D2H23.state", #state written by spinup above
   world_hdr_prefix = "ccr",
-  flowtable        = "worldfiles/Generated/ccr_mixed.flow", #what was made in pre-processing
+  flowtable        = "Run_RHESSys/worldfiles/Generated/ccr_mixed.flow", #what was made in pre-processing
   start            = dates[1],
   end              = dates[2],
   output_folder    = output_folder,
   output_prefix    = name,
   #harvest cmnd line
-  #commandline_options = "-b -g -str worldfiles/Generated/ccr_mixed.stream -stro -redefn worldfiles/Harvest/ccr_mixed_harvest"
+  #commandline_options = "-b -g -str Run_RHESSys/worldfiles/Generated/ccr_mixed.stream -stro -redefn Run_RHESSys/worldfiles/Harvest/ccr_mixed_harvest"
   #no harvest cmnd line
-  commandline_options = "-b -g -str worldfiles/Generated/ccr_mixed.stream -stro"
+  commandline_options = "-b -g -str Run_RHESSys/worldfiles/Generated/ccr_mixed.stream -stro"
 )
 
 run_rhessys_single(
@@ -121,7 +121,7 @@ run_rhessys_single(
 
 # Move transient state file to proper folder manually
 spin_state <- paste0(input_rhessys$world_file, ".Y2026M4D2H23.state")
-file.rename(spin_state, "worldfiles/transient/HarvestNone/ccr_mixed.world.Y2940M1D2H23.state.Y2026M4D2H23.state")
+file.rename(spin_state, "Run_RHESSys/worldfiles/transient/HarvestNone/ccr_mixed.world.Y2940M1D2H23.state.Y2026M4D2H23.state")
 
 
 
@@ -139,30 +139,30 @@ file.rename(spin_state, "worldfiles/transient/HarvestNone/ccr_mixed.world.Y2940M
 #
 # #header directly copied from hpb.hdr
 # input_hdr = IOin_hdr(
-#   basin      = "defs/basin.def",
-#   hillslope  = "defs/hill.def",
-#   zone       = "defs/zone.def",
-#   soil       = c("defs/soil_silt-loam.def", "defs/soil_water.def"),
-#   landuse    = "defs/landuse_undeveloped.def",
-#   stratum    = c("defs/veg_deciduous.def", "defs/veg_evergreen.def",
-#   "defs/veg_deciduous_ID5.def", "defs/veg_nonveg.def"),
-#   basestations = "clim/ccr_era5_1850_base"
+#   basin      = "Run_RHESSys/defs/basin.def",
+#   hillslope  = "Run_RHESSys/defs/hill.def",
+#   zone       = "Run_RHESSys/defs/zone.def",
+#   soil       = c("Run_RHESSys/defs/soil_silt-loam.def", "Run_RHESSys/defs/soil_water.def"),
+#   landuse    = "Run_RHESSys/defs/landuse_undeveloped.def",
+#   stratum    = c("Run_RHESSys/defs/veg_deciduous.def", "Run_RHESSys/defs/veg_evergreen.def",
+#   "Run_RHESSys/defs/veg_deciduous_ID5.def", "Run_RHESSys/defs/veg_nonveg.def"),
+#   basestations = "Run_RHESSys/clim/ccr_era5_1850_base"
 # )
 #
 # #make tec file locally
 # input_tec_data = IOin_tec_std(start = dates[1], end = dates[2], output_state = F)
 #
 # input_rhessys = IOin_rhessys_input(
-#   version          = "../RHESSys/rhessys/rhessys7.5",
-#   tec_file         =  paste0("tecfiles/",name,".tec"), #for using tecfile built below
-#   world_file       = "worldfiles/ccr_mixed.world.Y4000M1D2H23.state.Y2026M4D2H23.state", #what was made after harvest spinup run
+#   version          = "RHESSys_exec/rhessys7.5",
+#   tec_file         =  paste0("Run_RHESSys/tecfiles/",name,".tec"), #for using tecfile built below
+#   world_file       = "Run_RHESSys/worldfiles/ccr_mixed.world.Y4000M1D2H23.state.Y2026M4D2H23.state", #what was made after harvest spinup run
 #   world_hdr_prefix = "ccr",
-#   flowtable        = "worldfiles/ccr_mixed.flow", #what was made in pre-processing
+#   flowtable        = "Run_RHESSys/worldfiles/ccr_mixed.flow", #what was made in pre-processing
 #   start            = dates[1],
 #   end              = dates[2],
 #   output_folder    = output_folder,
 #   output_prefix    = name,
-#   commandline_options = "-b -g -str worldfiles/ccr_mixed.stream -stro -p" #have to add -p to end to get patch output to work, can't be before -str
+#   commandline_options = "-b -g -str Run_RHESSys/worldfiles/ccr_mixed.stream -stro -p" #have to add -p to end to get patch output to work, can't be before -str
 # )
 #
 # run_rhessys_single(

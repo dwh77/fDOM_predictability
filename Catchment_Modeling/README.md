@@ -10,22 +10,22 @@ fDOM_predictability/                 <- top-level repo (clone this)
 └── Catchment_Modeling/
     ├── RHESSys_exec/
     │   └── rhessys7.5                <- precompiled RHESSys executable, ready to use
-    └── Run_model/                    <- RHESSys application code: defs, worldfiles, clim,
+    └── Run_RHESSys/                    <- RHESSys application code: defs, worldfiles, clim,
                                           tecfiles, out, and the R scripts that run/evaluate the model
 ```
 
 A precompiled `rhessys7.5` executable is provided in `RHESSys_exec/`, so there's no need to clone or build the RHESSys source yourself — you can go straight from opening the dev container to running simulations.
 
-`Run_model/` is organized by the input files needed for RHESSys (`clim`, `defs`, `tecfiles`, `worldfiles`, `out`). These inputs are largely compiled through scripts in the `R` folder (see descriptions below). The `defs` folder files are from the RHESSys parameter library and have been updated to better calibrate RHESSys to CCR.
+`Run_RHESSys/` is organized by the input files needed for RHESSys (`clim`, `defs`, `tecfiles`, `worldfiles`, `out`). These inputs are largely compiled through scripts in the `R` folder (see descriptions below). The `defs` folder files are from the RHESSys parameter library and have been updated to better calibrate RHESSys to CCR.
 
-#### Folders within `Run_model/R` are as follows:
+#### Folders within `Run_RHESSys/R` are as follows:
 
 - **Clim_data** — scripts for compiling ERA5 and ISIMIP data sets
 - **Maps_Worldfiles** — contains scripts for compiling needed spatial data for the model (DEM and land cover) then for creating RHESSys worldfiles
 - **Run_RHESSys** — contains scripts for running the RHESSys model in CCR for spinup and other use cases; see `worldfiles/README.md` for further details on the worldfile pipeline
 - **Eval_RHESSys** — scripts for evaluating RHESSys outputs
 
-See `Run_model/R/README.md` and `Run_model/worldfiles/README.md` for more detail on each folder.
+See `Run_RHESSys/R/README.md` and `Run_RHESSys/worldfiles/README.md` for more detail on each folder.
 
 ------------------------------------------------------------------------
 
@@ -65,13 +65,13 @@ This builds the image from `.devcontainer/Dockerfile` that is located in this re
 
 ## Quick start guide for RHESSys
 
-This repo is configured so you can start running RHESSys simulations using worldfiles that have already been generated. Worldfiles for both the spinup period (representing pre-industrial conditions) and a transient run (representing current-day conditions) are provided in `Run_model/worldfiles/`.
+This repo is configured so you can start running RHESSys simulations using worldfiles that have already been generated. Worldfiles for both the spinup period (representing pre-industrial conditions) and a transient run (representing current-day conditions) are provided in `Run_RHESSys/worldfiles/`.
 
-- A example script for how RHESSys is run is provided in [`Run_model/R/Run_RHESSys/RHESSys_example_run.R`](Run_model/R/Run_RHESSys/RHESSys_example_run.R) that runs a 5-year simulation and plots simple outputs (LAI and streamflow). This is a good smoke test that your setup (container, R packages, executable, worldfiles) is working end to end.
+- A example script for how RHESSys is run is provided in [`Run_RHESSys/R/Run_RHESSys/RHESSys_example_run.R`](Run_RHESSys/R/Run_RHESSys/RHESSys_example_run.R) that runs a 5-year simulation and plots simple outputs (LAI and streamflow). This is a good smoke test that your setup (container, R packages, executable, worldfiles) is working end to end.
 
-- To recreate the spinup and transient run simulation, the script is provided in [`Run_model/R/Run_RHESSys/Spin_Run_CCR.R`](Run_model/R/Run_RHESSys/Spin_Run_CCR.R). NOTE: to rerun both of these scripts will take \~10 hours.
+- To recreate the spinup and transient run simulation, the script is provided in [`Run_RHESSys/R/Run_RHESSys/Spin_Run_CCR.R`](Run_RHESSys/R/Run_RHESSys/Spin_Run_CCR.R). NOTE: to rerun both of these scripts will take \~10 hours.
 
-- If you're interested in remaking worldfiles or RHESSys input maps, see the readME within the [`Run_model/R/Maps_Worldfiles`](Run_model/R/Maps_Worldfiles) folder.
+- If you're interested in remaking worldfiles or RHESSys input maps, see the readME within the [`Run_RHESSys/R/Maps_Worldfiles`](Run_RHESSys/R/Maps_Worldfiles) folder.
 
 To run the example: open `RHESSys_example_run.R` in VS Code and run the script. It starts from the pre-built worldfile state, runs RHESSys for 5 years, reads the output back in, and plots LAI and streamflow.
 

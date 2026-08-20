@@ -9,10 +9,12 @@ importance changes seasonally and under different hydrologic conditions.
 
 ## Repository structure
 
-- **`Predictions/`** — the core analysis for this project: compiling the daily
+- **`Predictions/`** — the prediction analysis for this project: compiling the daily
   driver dataset, fitting the four forecasting model types, generating 1–30 day
   predictions across 2024–2025, and evaluating model and driver performance. See
   below for the full script-by-script breakdown and run order.
+- **`Catchment_modeling/`** — Folder for compiling and running RHESSys catchment model
+to generate daily streamflow and DOC inputs. See ReadME within folder. 
 - **`Dissertation_Synthesis/`** — a separate project (broader fDOM variability
   synthesis across CCR/FCR/BVR); not part of this forecasting workflow.
 
