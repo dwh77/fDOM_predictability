@@ -5,18 +5,30 @@ library(tidyverse)
 library(patchwork)
 
 
-#### set working path
-workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys_dwh/out"
+############################## eval metric helper functions
+nse <- function(obs, mod) {
+  1 - sum((obs - mod)^2, na.rm = TRUE) /
+    sum((obs - mean(obs, na.rm = TRUE))^2, na.rm = TRUE)
+}
 
+kge <- function(obs, mod) {
+  r   <- cor(obs, mod, use = "complete.obs")
+  alpha <- sd(mod, na.rm = TRUE) / sd(obs, na.rm = TRUE)
+  beta  <- mean(mod, na.rm = TRUE) / mean(obs, na.rm = TRUE)
+  1 - sqrt((r - 1)^2 + (alpha - 1)^2 + (beta - 1)^2)
+}
 
+calc_metrics <- function(df) {
+  df |>
+    summarise(
+      RMSE = sqrt(mean((Observed - Modeled)^2)),
+      MAE  = mean(abs(Observed - Modeled)),
+      R2   = cor(Observed, Modeled)^2,
+      NSE  = nse(Observed, Modeled),
+      KGE  = kge(Observed, Modeled)
+      )
+}
 
-#### Check spinup
-# spin_grow <- read_delim(paste0(workpath, "/ccrSPIN/spinup_run_1000_grow_basin.daily"),
-#                         delim = " ", col_names = T) |>
-#   mutate(Date = ymd(paste(year, month, day, sep = "-")))
-#
-#
-# plot(spin_grow$Date, spin_grow$lai)
 
 ############################## function to read in outputs
 load_rhessys_output <- function(grow_path,
@@ -44,8 +56,8 @@ load_rhessys_output <- function(grow_path,
 
 # Usage
 # output_h2o_grow <- load_rhessys_output(
-#   grow_path   = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_grow_basin.daily"),
-#   h2o_path    = paste0(workpath, "/ccrTR/TR1850_2026_harvest1930_run_basin.daily"),
+#   grow_path   = "Catchment_Modeling/Run_RHESSys/out/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_grow_basin.daily",
+#   h2o_path    = "Catchment_Modeling/Run_RHESSys/out/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_basin.daily",
 #   area_m2     = 45.83578 * 1000000,   # optional, this is the default
 #   filter_date = "2021-01-01"           # optional, this is the default
 # )
@@ -58,15 +70,15 @@ load_rhessys_output <- function(grow_path,
 #### Note give large size of RHESSys outputs I am pushing a smaller output to github, but code that created those csvs is presented here
 
 # output_h2o_grow <- output_h2o_grow <- load_rhessys_output(
-#     grow_path   = paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_grow_basin.daily"),
-#     h2o_path    = paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_basin.daily"),
+#     grow_path   =  "Catchment_Modeling/Run_RHESSys/out/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_grow_basin.daily",
+#     h2o_path    =  "Catchment_Modeling/Run_RHESSys/out/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_basin.daily",
 #     area_m2     = 45.83578 * 1000000,   # optional, this is the default
 #     filter_date = "2021-01-01"           # optional, this is the default
 #   )
 #
-# write.csv(output_h2o_grow, "./out/DWH_sims/basin_output_2021_2026.csv", row.names = F)
+# write.csv(output_h2o_grow, "Catchment_Modeling/Run_RHESSys/out/TR_for_predictions/basin_output_2021_2026.csv", row.names = F)
 
-output_h2o_grow <- read_csv("./out/DWH_sims/basin_output_2021_2026.csv")
+output_h2o_grow <- read_csv("Catchment_Modeling/Run_RHESSys/out/TR_for_predictions/basin_output_2021_2026.csv")
 
 output_h2o_grow |>
   select(date, lai, DOC_mgL, NO3_mgL) |>
@@ -81,7 +93,7 @@ output_h2o_grow |>
 #### Note give large size of RHESSys outputs I am pushing a smaller output to github, but code that created those csvs is presented here
 
 
-# output_streamrouting <- read_delim(paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_streamrouting.daily"),
+# output_streamrouting <- read_delim(Catchment_Modeling/Run_RHESSys/out/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_streamrouting.daily",
 #                                    delim = " ", col_names = T)
 #
 # #get reaches of interest
@@ -108,10 +120,10 @@ output_h2o_grow |>
 #   pivot_longer(cols = c(Q_m3day_mod, DOC_mgL_mod), names_to = "variable", values_to = "value")
 #
 #
-# write.csv(sr_df, "./out/DWH_sims/streamroute_output_2021_2026.csv", row.names = F)
+# write.csv(sr_df, "Catchment_Modeling/Run_RHESSys/out/TR_for_predictions/streamroute_output_2021_2026.csv", row.names = F)
 
 
-sr_df <- read_csv("./out/DWH_sims/streamroute_output_2021_2026.csv")
+sr_df <- read_csv("Catchment_Modeling/Run_RHESSys/out/TR_for_predictions/streamroute_output_2021_2026.csv")
 
 
 #SR for a few vars
@@ -126,7 +138,8 @@ sr_df |>
 ################################################################################
 ### Eval data
 #### READ in and format eval data
-target <- read_csv("./Target_Data_comp/TargetData_2020_2025.csv")
+target <- read_csv("Catchment_Modeling/Run_RHESSys/Target_Data_comp/TargetData_2020_2025.csv") |>
+  select(-HPB_Q_PT_m3day, -HPB_Q_lm_m3day)
 
 # eval <- target |>
 #   mutate(date = as.Date(Date)) |>
@@ -135,9 +148,17 @@ target <- read_csv("./Target_Data_comp/TargetData_2020_2025.csv")
 #   rename(lai = lai_MODIS,
 #          Q_m3_day = HPB_Q_lm_m3day )
 
+flow_flags <- read_csv("Predictions/Data/HPB_USGS_Flows2.csv")
+
+hpb_PT_eval <- flow_flags |>
+  mutate(HPB_Q_PT_m3day = HPB_Q_cms *86400,
+         HPB_Q_lm_m3day = HPB_Q_cms_filled *86400) |>
+  select(Date,
+         HPB_Q_PT_m3day,
+         HPB_Q_lm_m3day )
+
 #make HPB lm be only when HPB data is missing
-target <- target |>
-  mutate(HPB_Q_lm_m3day = ifelse(is.na(HPB_Q_PT_m3day), HPB_Q_lm_m3day, HPB_Q_PT_m3day))
+target <- full_join(target, hpb_PT_eval, by = "Date")
 
 ################################################################################
 #### LAI evals ----
@@ -160,11 +181,23 @@ lai_SI <- output_h2o_grow |>
 
 lai_SI
 
+### Stats
+lai_stats_df <- output_h2o_grow |>
+  select(date, lai) |>
+  rename(Modeled = lai) |>
+  left_join(lai_eval, by = "date") |>
+  rename(Observed = lai_MODIS) |>
+  filter(!is.na(Observed), !is.na(Modeled))
+
+metrics_lai <- lai_stats_df |>
+  calc_metrics()
+
+metrics_lai
+
 ################################################################################
 #### HPB Q evals ----
 hpb_PT_eval <- target |>
   select(date = Date, HPB_Q_PT_m3day, HPB_Q_lm_m3day )
-
 
 # Prepare data and convert m3/day to m3/s (divide by 86400)
 hpb_plot <- sr_df |>
@@ -177,6 +210,15 @@ hpb_plot <- sr_df |>
 summary(hpb_plot$Q_m3day_mod)
 summary(hpb_plot$HPB_Q_PT_m3day)
 summary(hpb_plot$HPB_Q_lm_m3day)
+
+## HPB Q eval metrics -- modeled vs HPB_Q_lm_m3day only (this is the one and
+## only place Q gets evaluated; the flowmate-based stats below are DOC/NO3 only)
+hpb_Q_stats <- hpb_plot |>
+  select(Modeled = Q_m3day_mod, Observed = HPB_Q_lm_m3day) |>
+  filter(!is.na(Observed), !is.na(Modeled)) |>
+  calc_metrics()
+
+hpb_Q_stats
 
 
 #plot
@@ -194,7 +236,10 @@ Q_SI <- hpb_plot |>
 Q_SI
 
 ################################################################################
-#### Stream chem and flowmate eval ----
+#### Stream chem eval ----
+## Q is intentionally excluded here -- it's evaluated once, above, in the
+## HPB Q evals section (modeled vs HPB_Q_lm_m3day only). This pipeline is
+## DOC/NO3 only, so the flowmate-derived Q is never used for eval stats.
 
 ##set up obs data
 obs_long <- target |>
@@ -205,36 +250,32 @@ obs_long <- target |>
          Site_name = ifelse(Site == 300, "SMB", Site_name),
          Site_name = ifelse(Site == 200, "CCS", Site_name)
          ) |>
-  select(date, Site_name, Q_m3day_flowmate, NO3_mgL, DOC_mgL) |>
+  select(date, Site_name, NO3_mgL, DOC_mgL) |>
   rename(Site = Site_name) |>
-  pivot_longer(cols = c(Q_m3day_flowmate, DOC_mgL, NO3_mgL),
+  pivot_longer(cols = c(DOC_mgL, NO3_mgL),
                names_to = "Variable", values_to = "Value") |>
   mutate(
     Data_type = "Observed",
     Variable  = case_when(
-      str_detect(Variable, "Q")   ~ "Q_m3s",
       str_detect(Variable, "DOC") ~ "DOC_mgL",
       str_detect(Variable, "NO3") ~ "NO3_mgL"
-    ),
-    # Q was in m3/day; convert to m3/s (cms) to match the Q_SI plot units
-    Value = ifelse(Variable == "Q_m3s", Value / 86400, Value)
+    )
   ) |>
   select(Date = date, Site, Data_type, Variable, Value)
 
 
-# Pivot sr_df long, remove CCR dam, clean variable names
+# Pivot sr_df long, remove CCR dam and Q, clean variable names
 sr_long <- sr_df |>
-  filter(reach_ID_name != "CCR dam") |>
+  filter(reach_ID_name != "CCR dam",
+         !str_detect(variable, "Q")) |>
   rename(Site = reach_ID_name) |>
   mutate(
     Data_type = "Modeled",
     Variable  = case_when(
-      str_detect(variable, "Q")   ~ "Q_m3s",
       str_detect(variable, "DOC") ~ "DOC_mgL",
       str_detect(variable, "NO3") ~ "NO3_mgL"
     ),
-    # Q was in m3/day; convert to m3/s (cms) to match the Q_SI plot units
-    Value = ifelse(Variable == "Q_m3s", value / 86400, value)
+    Value = value
   ) |>
   select(Date = date, Site, Data_type, Variable, Value)
 
@@ -273,31 +314,6 @@ stats_df <- combined_long |>
   pivot_wider(names_from = Data_type, values_from = Value) |>
   filter(!is.na(Observed), !is.na(Modeled))
 
-# functions
-nse <- function(obs, mod) {
-  1 - sum((obs - mod)^2, na.rm = TRUE) /
-    sum((obs - mean(obs, na.rm = TRUE))^2, na.rm = TRUE)
-}
-
-kge <- function(obs, mod) {
-  r   <- cor(obs, mod, use = "complete.obs")
-  alpha <- sd(mod, na.rm = TRUE) / sd(obs, na.rm = TRUE)
-  beta  <- mean(mod, na.rm = TRUE) / mean(obs, na.rm = TRUE)
-  1 - sqrt((r - 1)^2 + (alpha - 1)^2 + (beta - 1)^2)
-}
-
-# Helper function
-calc_metrics <- function(df) {
-  df |>
-    summarise(
-      RMSE = sqrt(mean((Observed - Modeled)^2)),
-      MAE  = mean(abs(Observed - Modeled)),
-      R2   = cor(Observed, Modeled)^2,
-      NSE  = nse(Observed, Modeled),
-      KGE  = kge(Observed, Modeled)
-      )
-}
-
 # Aggregated across sites
 metrics_overall <- stats_df |>
   group_by(Variable) |>
@@ -312,20 +328,5 @@ metrics_overall
 #
 # metrics_by_site
 
-
-################################################################################
-### LAI metrics ----
-
-lai_stats_df <- output_h2o_grow |>
-  select(date, lai) |>
-  rename(Modeled = lai) |>
-  left_join(lai_eval, by = "date") |>
-  rename(Observed = lai_MODIS) |>
-  filter(!is.na(Observed), !is.na(Modeled))
-
-metrics_lai <- lai_stats_df |>
-  calc_metrics()
-
-metrics_lai
 
 

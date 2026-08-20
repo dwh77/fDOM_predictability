@@ -2,7 +2,7 @@
 # also calculate flow percentiles for period of prediction generation
 
 
-
+library(tidyverse)
 library(dataRetrieval)
 library(ggpmisc)
 
@@ -45,14 +45,16 @@ USGS |>
 
 
 #### Read in HPB flow ----------------------------
-hpbQ <- read_csv("https://pasta.lternet.edu/package/data/eml/edi/2333/1/630f42ffb3560c3a6afd592511756c1e")
+hpbQ <- read_csv("https://pasta.lternet.edu/package/data/eml/edi/2333/1/630f42ffb3560c3a6afd592511756c1e?key=yltMpS4UEIk12AvB9L7OL5uRiG0")
 
 #get daily mean stage
 HPB_daily <- hpbQ |>
   mutate(Date = as.Date(DateTime)) |>
+  # filter(Date < ymd("2025-04-01")) |>
   group_by(Date) |>
   summarise(#Daily_Stage_cm = mean(stage_cm, na.rm = T),
-            Daily_Q_cms = mean(Flow_cms, na.rm = T))
+            Daily_Q_cms = mean(Flow_cms, na.rm = T)) |>
+  filter(Daily_Q_cms > 0.0005)
 
 #look at data
 HPB_daily |> ggplot(aes(x= Date, y = Daily_Q_cms))+geom_point()
@@ -78,48 +80,94 @@ USGS_HPB_Q |>
   theme_bw()
 
 
-## fit regression
-Qcms_lm <- lm(HPB_Q_cms ~ USGS_Q_cms, data = USGS_HPB_Q)
-summary(Qcms_lm)
-intercept <- coef(Qcms_lm)[1]
-slope <- coef(Qcms_lm)[2]
-
-lm_label <- paste0("y = ", round(coef(Qcms_lm)[2], 3), "x ", round(coef(Qcms_lm)[1], 3))
-
-#calc interp and fill missing
-USGS_HPB_Q <- USGS_HPB_Q |>
-  mutate(HPBinterp_Q_cms = (slope*USGS_Q_cms) + intercept
-    ) |>
-  mutate(HPB_Q_cms_filled = ifelse(is.na(HPB_Q_cms), HPBinterp_Q_cms, HPB_Q_cms))
-
-
-## get pearson r
-Q_noNA <- USGS_HPB_Q |>
-  filter(!is.na(HPB_Q_cms))
-
-cor.test(Q_noNA$HPB_Q_cms, Q_noNA$USGS_Q_cms, method = "pearson")
-correlation <- cor(Q_noNA$HPB_Q_cms, Q_noNA$USGS_Q_cms, method = "pearson")
-correlation
-
-cor_label <- paste0("Pearson's r = ", round(correlation, 2))
-
-#Plot
-USGS_HPB_Q |>
-  ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms))+
-  geom_point()+
-  geom_abline(intercept = coef(Qcms_lm)[1], slope = coef(Qcms_lm)[2],
-              linewidth = 0.75, color = "red")+
-  theme_bw()+
-  xlim(0,4)+
-  labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)")+
-  annotate("text", x = 1.5, y = 0.65, label = lm_label,
-           hjust = 1.1, vjust = -0.5, size = 3.5)+
-  annotate("text", x = 1.5, y = 0.75, label = cor_label,
-           hjust = 1.1, vjust = -0.5, size = 3.5)
+# ## fit regression
+# Qcms_lm <- lm(HPB_Q_cms ~ USGS_Q_cms, data = USGS_HPB_Q)
+# summary(Qcms_lm)
+# intercept <- coef(Qcms_lm)[1]
+# slope <- coef(Qcms_lm)[2]
+#
+# lm_label <- paste0("y = ", round(coef(Qcms_lm)[2], 3), "x ", round(coef(Qcms_lm)[1], 3))
+#
+# #calc interp and fill missing
+# USGS_HPB_Q <- USGS_HPB_Q |>
+#   mutate(HPBinterp_Q_cms = (slope*USGS_Q_cms) + intercept
+#     ) |>
+#   mutate(HPB_Q_cms_filled = ifelse(is.na(HPB_Q_cms), HPBinterp_Q_cms, HPB_Q_cms))
+#
+#
+# ## get pearson r
+# Q_noNA <- USGS_HPB_Q |>
+#   filter(!is.na(HPB_Q_cms))
+#
+# cor.test(Q_noNA$HPB_Q_cms, Q_noNA$USGS_Q_cms, method = "pearson")
+# correlation <- cor(Q_noNA$HPB_Q_cms, Q_noNA$USGS_Q_cms, method = "pearson")
+# correlation
+#
+# cor_label <- paste0("Pearson's r = ", round(correlation, 2))
+#
+# #Plot
+# USGS_HPB_Q |>
+#   ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms))+
+#   geom_point()+
+#   geom_abline(intercept = coef(Qcms_lm)[1], slope = coef(Qcms_lm)[2],
+#               linewidth = 0.75, color = "red")+
+#   theme_bw()+
+#   xlim(0,4)+
+#   labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)")+
+#   annotate("text", x = 1.5, y = 0.65, label = lm_label,
+#            hjust = 1.1, vjust = -0.5, size = 3.5)+
+#   annotate("text", x = 1.5, y = 0.75, label = cor_label,
+#            hjust = 1.1, vjust = -0.5, size = 3.5)
 
 
 ##save figure
 # ggsave("./Predictions/Figures/HPB_USGS_SIfig.png", height = 3.5, width = 4.5, units = "in")
+
+
+
+#### Log-log regression: USGS vs HPB flow ----
+#drop non-positive flows before logging
+USGS_HPB_Q_pos <- USGS_HPB_Q |>
+  filter(USGS_Q_cms > 0, HPB_Q_cms > 0)
+
+cor_loglog <- cor.test(log(USGS_HPB_Q_pos$USGS_Q_cms), log(USGS_HPB_Q_pos$HPB_Q_cms), method = "pearson")
+cor_loglog
+pearson_label_loglog <- paste0("Pearson's r = ", round(cor_loglog$estimate, 2))
+
+USGS_HPB_Q_pos |>
+  ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms)) +
+  geom_point() +
+  stat_poly_line(method = "lm", linewidth = 1) +
+  stat_poly_eq(small.p = TRUE, label.x = "left", label.y = "top", parse = TRUE,
+               aes(label = after_stat(paste(rr.label, p.value.label, sep = "~~~")))) +
+  annotate(geom = "text_npc", npcx = 0.05, npcy = 0.83,
+           label = pearson_label_loglog, hjust = 0) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)") +
+  theme_bw()
+
+
+## Use the log-log relationship to estimate HPB from USGS for every day
+loglog_lm <- lm(log(HPB_Q_cms) ~ log(USGS_Q_cms), data = USGS_HPB_Q_pos)
+
+loglog_a <- exp(coef(loglog_lm)[1])
+loglog_b <- coef(loglog_lm)[2]
+
+USGS_HPB_Q <- USGS_HPB_Q |>
+  mutate(HPBinterp_Q_cms = ifelse(USGS_Q_cms > 0,
+                                     loglog_a * USGS_Q_cms ^ loglog_b,
+                                     NA)) |>
+  mutate(HPB_Q_cms_filled = ifelse(is.na(HPB_Q_cms), HPBinterp_Q_cms, HPB_Q_cms))
+
+# #quick check: estimated vs observed, for days HPB was actually measured
+# USGS_HPB_Q |>
+#   filter(!is.na(HPB_Q_cms)) |>
+#   ggplot(aes(x = HPB_Q_cms, y = HPBinterp_Q_cms)) +
+#   geom_point(alpha = 0.4) +
+#   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+#   labs(x = "Observed HPB Flow (cms)", y = "Log-log estimated HPB Flow (cms)") +
+#   theme_bw()
 
 
 #timeseries
@@ -129,7 +177,15 @@ USGS_HPB_Q |>
   pivot_longer(-1) |>
   ggplot(aes(x= Date, y = value, color = name))+
   geom_point()+
+  # scale_y_log10()+
   theme_bw()+ theme(legend.position = "top")
+
+
+
+
+
+
+
 
 
 
@@ -169,7 +225,7 @@ flow_flags <- USGS_HPB_Q |>
 USGS_HPB_Q_classes <- USGS_HPB_Q |>
   left_join(flow_flags, by = "Date")
 
-write.csv(USGS_HPB_Q_classes, "./Predictions/Data/HPB_USGS_Flows.csv", row.names = F)
+write.csv(USGS_HPB_Q_classes, "./Predictions/Data/HPB_USGS_Flows2.csv", row.names = F)
 
 
 

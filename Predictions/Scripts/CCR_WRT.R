@@ -131,7 +131,7 @@ wrt |>
   ggplot(aes(x = Strat, y = WRT_days, fill = Strat)) +
   geom_boxplot(alpha = 0.6, outlier.shape = NA) +  # hide outliers since we plot all points
   geom_jitter(width = 0.2, alpha = 0.4, size = 1.5) +
-  scale_y_log10()+
+  # scale_y_log10()+
   annotate("text", x = 1.5, y = max(wrt$WRT_days, na.rm = TRUE),
            label = p_label, size = 5, fontface = "italic") +
   labs(x = NULL, y = "Water Residence Time (days)") +
