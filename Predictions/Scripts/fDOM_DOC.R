@@ -17,6 +17,8 @@ fdom_df <- read_csv("./Dissertation_Synthesis/Daily_fDOM_data.csv")
 ## DOC at each reservoir's shallow depth
 doc_shallow <- chem |>
   mutate(Date = as.Date(DateTime)) |>
+  # filter(Date >= ymd("2022-01-01"),
+  #        Depth_m == 1.5) |>
   filter(Reservoir %in% c("CCR", "FCR"), Site == 50) |>
   select(Reservoir, Date, Depth_m, DOC_mgL) |>
   group_by(Reservoir, Date, Depth_m) |>
@@ -94,7 +96,7 @@ plot_fdom_doc <- function(df, title, exclude_months = NULL, log_log = FALSE) {
     annotate(geom = "text_npc", npcx = 0.05, npcy = 0.83,
              label = pearson_label, hjust = 0) +
     labs(x = "fDOM (QSU)", y = "DOC (mg/L)", color = "Reservoir", title = title) +
-    theme_bw()+ theme(legend.position = "top")
+    theme_bw()+ theme(legend.position = "right")
 
   if (one_reservoir) {
     p <- p + theme(legend.position = "none")
@@ -111,13 +113,22 @@ plot_fdom_doc <- function(df, title, exclude_months = NULL, log_log = FALSE) {
 }
 
 ## 1) CCR only
-plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "CCR"), "CCR: fDOM vs DOC, 1.5m")
+p_ccr <-
+  plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "CCR"), "CCR")
 
 ## 2) FCR only
-plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "FCR"), "FCR: fDOM vs DOC, 1.6m")
+p_fcr <-
+  plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "FCR"), "FCR")
 
 ## 3) CCR and FCR combined, single regression fit across all the data
-plot_fdom_doc(fdom_doc_shallow, "CCR and FCR combined: fDOM vs DOC, shallow depth")
+p_all <-
+  plot_fdom_doc(fdom_doc_shallow, "CCR and FCR")
+
+(p_ccr + labs(tag = "a")) |
+  (p_fcr + labs(tag = "b")) |
+  (p_all + labs(tag = "c")) &
+  theme(plot.tag = element_text(size = 14, face = "bold"),
+        plot.margin = margin(t = 2, r = 2, b = 2, l = 2, unit = "pt"))
 
 
 # #check log log
@@ -127,7 +138,7 @@ plot_fdom_doc(fdom_doc_shallow, "CCR and FCR combined: fDOM vs DOC, shallow dept
 
 # example excluding specific months from the fit, e.g. Sept/Oct:
 plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "CCR"),
-              "CCR: fDOM vs DOC, 1.5m (no Sep/Oct)", exclude_months = c(9, 10,11))
+              "CCR: fDOM vs DOC, 1.5m (no Fall)", exclude_months = c( 9,10,11))
 
 plot_fdom_doc(fdom_doc_shallow |> filter(Reservoir == "FCR"),
               "FCR: fDOM vs DOC, 1.5m (no Sep/Oct)", exclude_months = c(9, 10,11))
