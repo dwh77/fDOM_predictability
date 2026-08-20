@@ -144,7 +144,7 @@ USGS_HPB_Q_pos |>
            label = pearson_label_loglog, hjust = 0) +
   scale_x_log10() +
   scale_y_log10() +
-  labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)") +
+  labs(x = "USGS Flow (cms, log scale)", y = "HPB Flow (cms, log scale)") +
   theme_bw()
 
 
@@ -177,7 +177,6 @@ USGS_HPB_Q |>
   pivot_longer(-1) |>
   ggplot(aes(x= Date, y = value, color = name))+
   geom_point()+
-  # scale_y_log10()+
   theme_bw()+ theme(legend.position = "top")
 
 
