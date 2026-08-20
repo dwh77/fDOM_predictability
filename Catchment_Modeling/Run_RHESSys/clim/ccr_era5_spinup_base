@@ -1,0 +1,22 @@
+101 base_station_id
+100 x_coordinate
+100 y_coordinate
+346.7 z_coordinate
+2.0 effective_lai
+10 screen_height
+annual annual_climate_prefix
+0 number_non_critical_annual_sequences
+monthly monthly_climate_prefix
+0 number_non_critical_monthly_sequences
+Run_model/clim/ccr_era5_spinup daily_climate_prefix
+8 number_non_critical_daily_sequences
+wind
+relative_humidity
+atm_trans
+Kdown_direct
+Kdown_diffuse
+vpd
+ndep_NO3
+ndep_NH4
+hourly hourly_climate_prefix
+0 number_non_critical_hourly_sequences
