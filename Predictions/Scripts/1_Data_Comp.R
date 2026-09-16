@@ -175,7 +175,8 @@ Catwalk_df <- full_join(catwalk_daily, density_join,  by = "Date")
 
 #### Get RHESSys data and format to bind ----
 ##read in RHESSys
-workpath <- "C:/Users/dwh18/OneDrive/Desktop/R_Projects/RHESSys_development/ccr_rhessys_dwh/out"  #ccr_rhessys/out/ccr_patch1500_cow1; ccr_patch1500_KEEP
+getwd()
+workpath <- "./Catchment_Modeling/Run_RHESSys/out"
 
 output_grow <- read_delim(paste0(workpath, "/ccrTR/HarvestNone/TR1850_2026_NOharvest_run_grow_basin.daily"),
                           delim = " ", col_names = T)
@@ -229,7 +230,7 @@ rhessys_df <- output_h2o_grow |>
 #### format and export
 datecheck <- seq(ymd("2021-08-19"), ymd("2026-02-01"), by = "day")
 
-Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df2, by = "Date") |>
+Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
   # full_join(daily_met, by = "Date") |>
   filter(Date >= ymd("2021-08-19"),
          Date <= ymd("2026-02-01")) |>

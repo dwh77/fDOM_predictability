@@ -9,9 +9,9 @@ library(ggspatial)      # for scale bar & north arrow
 library(ggnewscale)
 
 # ── Load data ────────────────────────────────────────────────────────────────
-ws        <- rast("./R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_ws.tif")
-streams1K <- rast("./R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_stream1K.tif")
-dem       <- rast("./R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_dem.tif")
+ws        <- rast("./Catchment_Modeling/Run_RHESSys/R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_ws.tif")
+streams1K <- rast("./Catchment_Modeling/Run_RHESSys/R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_stream1K.tif")
+dem       <- rast("./Catchment_Modeling/Run_RHESSys/R/Maps_Worldfiles/CCR_for_MS/spatial_data/ccr_dem.tif")
 
 # ── Reproject ─────────────────────────────────────────────────────────────────
 target_crs   <- "EPSG:3857"
@@ -114,30 +114,30 @@ p <- ggplot() +
           show.legend = FALSE) +
 
   # 5. Site points
-  new_scale_fill() +
-  geom_sf(data   = sites,
-          aes(fill = name, shape = name),
-          colour = "black",
-          size   = 4,
-          stroke = 0.5) +
-  scale_fill_manual(
-    name   = NULL,
-    values = c(
-      "CCR Dam" = "#FF4444",
-      "HPB"     = "#4FC3F7",
-      "CCS"     = "#81C784",
-      "SMB"     = "#FFB74D"
-    )
-  ) +
-  scale_shape_manual(
-    name   = NULL,
-    values = c(
-      "CCR Dam" = 24,
-      "HPB"     = 22,
-      "CCS"     = 22,
-      "SMB"     = 22
-    )
-  ) +
+  # new_scale_fill() +
+  # geom_sf(data   = sites,
+  #         aes(fill = name, shape = name),
+  #         colour = "black",
+  #         size   = 4,
+  #         stroke = 0.5) +
+  # scale_fill_manual(
+  #   name   = NULL,
+  #   values = c(
+  #     "CCR Dam" = "#FF4444",
+  #     "HPB"     = "#4FC3F7",
+  #     "CCS"     = "#81C784",
+  #     "SMB"     = "#FFB74D"
+  #   )
+  # ) +
+  # scale_shape_manual(
+  #   name   = NULL,
+  #   values = c(
+  #     "CCR Dam" = 24,
+  #     "HPB"     = 22,
+  #     "CCS"     = 22,
+  #     "SMB"     = 22
+  #   )
+  # ) +
 
   # ── Annotations ─────────────────────────────────────────────────────────────
   annotation_scale(
@@ -254,7 +254,7 @@ final_map <- ggdraw() +
 #note that will have to look at tif generated below to confirm map location in corner
 final_map
 
-ggsave("./R/Maps_Worldfiles/CCR_for_MS/ccr_final_map.tif", final_map,
+ggsave("./Catchment_Modeling/Run_RHESSys/R/Maps_Worldfiles/CCR_for_MS/ccr_final_map_Talk.tif", final_map,
        width = 5, height = 4.5, dpi = 600, bg = "white")
 
 

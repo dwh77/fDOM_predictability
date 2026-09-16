@@ -12,7 +12,7 @@ eval <- read_csv("./Predictions/Data/Daily_catwalk_RH_2021_2026.csv") |>
   mutate(Train = ifelse(Date < ymd("2024-01-01"), "Train", "Pred"))
 
 
-local_flow <- read_csv("./Predictions/Data/HPB_USGS_Flows.csv")
+local_flow <- read_csv("./Predictions/Data/HPB_USGS_Flows2.csv")
 
 
 
