@@ -24,7 +24,7 @@ to generate daily streamflow and DOC inputs. See ReadME within folder.
 
 ### `Predictions/Data/`
 
-- The daily compiled dataset produced by `1_Data_Comp.R`
+- The daily compiled dataset produced by `1_Data_Comp.R`, '1_b_USGS_HPB-flow.R', and '1c_CCR_WRT.R',
   (`Daily_catwalk_RH_2021_2026.csv`, plus a few supporting files) is **already
   provided** here — you don't need to rerun script 1 just to explore the data
   or jump straight to model fitting/evaluation.
@@ -52,6 +52,7 @@ Manuscript/SI figures produced by `2_Timeseries_Figures.R` and other scripts.
    using a regression against the nearby USGS Tinker Creek gauge, and computes
    flow-percentile classes (high/low flow) used later for the high-vs-low-flow
    evaluation in script 4. Produces `HPB_USGS_Flows.csv`.
+4. **`1c_CCR_WRT.r`** estimates water residence time in CCR from RHESSys discharge estimates.
 4. **`2_Timeseries_Figures.R`** — builds the manuscript timeseries figures
    and summary statistics from the compiled dataset. Depends on outputs of scripts 1 and 1b.
 5. **`3a_Predict_AR_RollingRefit.Rmd`**, **`3b_Predict_ARIMA_RollingRefit.Rmd`**,
@@ -74,13 +75,7 @@ Manuscript/SI figures produced by `2_Timeseries_Figures.R` and other scripts.
    models plus persistence, builds the multi-model ensemble, computes
    RMSE/skill metrics, and produces the evaluation figures.
 
-Two supplementary scripts, not part of the core pipeline above and not
-required to run in any particular order:
 
-- **`fDOM_DOC.R`** — exploratory regressions relating fDOM to DOC chemistry
-  across depths and reservoirs (CCR/FCR), including an iron-interference
-  correction check.
-- **`CCR_WRT.R`** — quick water residence time calculations for CCR/HPB from
-  RHESSys discharge output.
+
 
 
