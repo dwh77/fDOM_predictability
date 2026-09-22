@@ -7,7 +7,7 @@ library(patchwork)
 
 
 ## Read in data
-eval <- read_csv("./Predictions/Data/Daily_catwalk_RH_2021_2026.csv") |>
+eval <- read_csv("./Predictions/Data/Extras_Daily_Cat_Met_RH_2021_2026.csv") |>
   mutate(Date = as.Date(Date)) |> filter(Date <= ymd("2026-01-31")) |>
   mutate(Train = ifelse(Date < ymd("2024-01-01"), "Train", "Pred"))
 
@@ -79,16 +79,22 @@ DO_plot <- eval |> ggplot(aes(x = Date, y = DOsat_1_pct_daily))+ geom_point()
 DO_plot
 # plotly::ggplotly(DO_plot)
 
+#temp
+temp_plot <- eval |> ggplot(aes(x = Date, y = Temp_1_C_daily))+ geom_point()
+temp_plot
+ # plotly::ggplotly(temp_plot)
+
 
 #### SI plot for all model inputs ----
 
 ## Display order: fDOM, stratification, DO, chla, Q, DOC
-driver_order <- c("fDOM_1_QSU_daily", "Diff_Dens_1_max", "DOsat_1_pct_daily",
+driver_order <- c("fDOM_1_QSU_daily", "Temp_1_C_daily", "Diff_Dens_1_max", "DOsat_1_pct_daily",
                    "Chla_1_ugL_daily", "RH_Q_cms", "RH_DOC_mgL")
 
 ## Y-axis label per variable
 driver_labels <- list(
   "fDOM_1_QSU_daily"  = "fDOM \n (QSU)",
+  "Temp_1_C_daily"    = "Water \n Temperature \n (°C)",
   "Diff_Dens_1_max"   =  expression(atop("Density", displaystyle(atop("Difference", "(kg m"^-3*")")))),
   "DOsat_1_pct_daily" = "DO \n (% sat)",
   "Chla_1_ugL_daily"  = expression(atop("Chl-a", "("*mu*"g L"^-1*")")),
@@ -120,8 +126,8 @@ driverplot <- wrap_plots(driver_plots, ncol = 1) +
 driverplot
 # plotly::ggplotly(driverplot)
 
-# ggsave("./Predictions/Figures/fDOM_drivers_TS.png", driverplot,
-#        height = 7, width = 6, units = "in")
+ggsave("./Predictions/Figures/fDOM_drivers_TS_withTEMP.png", driverplot,
+       height = 7, width = 6, units = "in")
 
 
 

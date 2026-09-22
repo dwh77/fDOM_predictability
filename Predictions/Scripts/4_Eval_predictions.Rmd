@@ -174,7 +174,7 @@ fig4_fig
 
 
 ##plotly figures
-# plotly::ggplotly(rmse_fig4)
+plotly::ggplotly(rmse_fig4)
 # plotly::ggplotly(skill_fig4)
 
 
@@ -187,7 +187,7 @@ RMSE and Skill by model: MS Figure 3
 ```{r}
 
 #### RMSE by model
-metrics_eval_all |> 
+rmse_by_model <- metrics_eval_all |> 
   mutate(model_class = ifelse(model_class == "NNETAR", "NNAR", model_class)) |> 
   # filter(model_class == "Ensemble") |> 
   # filter(model_class %in% c("Ensemble", "Persistence")) |> 
@@ -199,7 +199,28 @@ metrics_eval_all |>
   labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
   theme_bw() + theme(legend.position = "top", text = element_text(size = 16))
 
-ggsave("../Figures/SI_rmse_by_structure.png", width = 7, height = 5, units = "in")
+rmse_by_model
+
+# ggsave("../Figures/SI_rmse_by_structure.png", width = 7, height = 5, units = "in")
+
+plotly::ggplotly(rmse_by_model)
+
+## persistence only
+persistence_plot <- metrics_eval_all |> 
+  mutate(model_class = ifelse(model_class == "NNETAR", "NNAR", model_class)) |> 
+  filter(model_class == "Persistence") |> 
+  # filter(model_class %in% c("Ensemble", "Persistence")) |> 
+  ggplot(aes(x = Horizon, y = RMSE, col = model_vars)) +
+  geom_line(linewidth = 1.5) +
+  facet_wrap(~model_class)+
+  scale_color_manual(values = model_vars_colors) +
+  # ylim(0.5, 3.2)+
+  labs(x = "Prediction horizon (days)", y = "RMSE (QSU)", col = NULL) +
+  theme_bw() + theme(legend.position = "top", text = element_text(size = 16))
+
+persistence_plot
+
+plotly::ggplotly(persistence_plot)
 
 
 #### RMSE by model flipped presentation
@@ -424,8 +445,11 @@ get tinker data and join
 
 ```{r}
 #change change flow class to be flow_class_usgs to use just the USGS data based classifications
-flow_flags <- read_csv("../Data/HPB_USGS_Flows2.csv") |> 
-   select(Date, flow_class = flow_class_hpb) 
+flow_flags <- read_csv("../Data/HPB_USGS_Flows2.csv") |>
+   select(Date, flow_class = flow_class_hpb)
+
+# flow_flags <- read_csv("../Data/WRT_rhessys_estimates.csv") |>
+#    select(Date, flow_class = flow_class_RH_Q_cms)
 
 
 ## Join to pred eval and plot

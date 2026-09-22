@@ -134,7 +134,7 @@ cor_loglog <- cor.test(log(USGS_HPB_Q_pos$USGS_Q_cms), log(USGS_HPB_Q_pos$HPB_Q_
 cor_loglog
 pearson_label_loglog <- paste0("Pearson's r = ", round(cor_loglog$estimate, 2))
 
-USGS_HPB_Q_pos |>
+figS1 <- USGS_HPB_Q_pos |>
   ggplot(aes(x = USGS_Q_cms, y = HPB_Q_cms)) +
   geom_point() +
   stat_poly_line(method = "lm", linewidth = 1) +
@@ -144,8 +144,10 @@ USGS_HPB_Q_pos |>
            label = pearson_label_loglog, hjust = 0) +
   scale_x_log10() +
   scale_y_log10() +
-  labs(x = "USGS Flow (cms, log scale)", y = "HPB Flow (cms, log scale)") +
-  theme_bw()
+  labs(x = "USGS Flow (cms)", y = "HPB Flow (cms)") +
+  theme_bw()+ theme(text = element_text(size = 16))
+
+figS1
 
 
 ## Use the log-log relationship to estimate HPB from USGS for every day

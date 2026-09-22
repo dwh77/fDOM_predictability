@@ -7,7 +7,7 @@ library(patchwork)
 #read in chem
 ## Carey lab read only key: ?key=yltMpS4UEIk12AvB9L7OL5uRiG0
 chem <- read.csv( "https://pasta.lternet.edu/package/data/eml/edi/199/13/3f09a3d23b7b5dd32ed7d28e9bc1b081?key=yltMpS4UEIk12AvB9L7OL5uRiG0" )
-# chem <- read.csv("C:/Users/dwh18/Downloads/chemistry_2013_2024 (2).csv")
+
 
 fdom_df <- read_csv("./Dissertation_Synthesis/Daily_fDOM_data.csv")
 
@@ -21,6 +21,7 @@ doc_shallow <- chem |>
   #        Depth_m == 1.5) |>
   filter(Reservoir %in% c("CCR", "FCR"), Site == 50) |>
   select(Reservoir, Date, Depth_m, DOC_mgL) |>
+  # rbind(chem26a) |>
   group_by(Reservoir, Date, Depth_m) |>
   summarise(DOC = mean(DOC_mgL, na.rm = TRUE), .groups = "drop") |>
   filter((Reservoir == "CCR" & Depth_m == 1.5) |
@@ -96,7 +97,7 @@ plot_fdom_doc <- function(df, title, exclude_months = NULL, log_log = FALSE) {
     annotate(geom = "text_npc", npcx = 0.05, npcy = 0.83,
              label = pearson_label, hjust = 0) +
     labs(x = "fDOM (QSU)", y = "DOC (mg/L)", color = "Reservoir", title = title) +
-    theme_bw()+ theme(legend.position = "right")
+    theme_bw()+ theme(legend.position = "right", text = element_text(size = 16))
 
   if (one_reservoir) {
     p <- p + theme(legend.position = "none")
@@ -124,9 +125,11 @@ p_fcr <-
 p_all <-
   plot_fdom_doc(fdom_doc_shallow, "CCR and FCR")
 
-(p_ccr + labs(tag = "a")) |
-  (p_fcr + labs(tag = "b")) |
-  (p_all + labs(tag = "c")) &
+# (figS1 + labs(tag = "a")) /
+( (p_ccr + labs(tag = "b")) |
+  (p_fcr + labs(tag = "c")) |
+  (p_all + labs(tag = "d")) )
+&
   theme(plot.tag = element_text(size = 14, face = "bold"),
         plot.margin = margin(t = 2, r = 2, b = 2, l = 2, unit = "pt"))
 

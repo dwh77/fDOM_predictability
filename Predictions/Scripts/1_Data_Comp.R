@@ -252,7 +252,7 @@ Catwalk_RH_df <- full_join(Catwalk_df, rhessys_df, by = "Date") |>
 
 #### Check lags and coor matrix
 
-Catwalk_RH_df <- read_csv("./Predictions/Data/Extras_Daily_Cat_Met_RH_2021_2026.csv")
+# Catwalk_RH_df <- read_csv("./Predictions/Data/Extras_Daily_Cat_Met_RH_2021_2026.csv")
 
 ## ACF
 library(astsa)
@@ -271,6 +271,9 @@ df_corr1m <- Catwalk_RH_df |>
 
 
 cor_matrix <- cor(df_corr1m, use = "pairwise.complete.obs")
+
+cor_matrix <- round(cor_matrix, 2)
+
 
 # compute p-values
 p_matrix <- cor.mtest(df_corr1m, conf.level = 0.95)$p
@@ -292,6 +295,16 @@ corrplot(cor_matrix,
          pch.cex     = 2,
          insig       = "label_sig",
          col         = colorRampPalette(c("red", "white", "blue"))(200))
+
+
+## look at temp vs stratification
+# df_corr1m |>
+#   select(fDOM_1_QSU_daily, Diff_Dens_1_max, Temp_1_C_daily) |>
+#   pivot_longer(-1) |>
+#   ggplot(aes(x = value, y = fDOM_1_QSU_daily))+
+#   geom_point()+
+#   facet_wrap(~name, scales = "free")+
+#   geom_smooth(method = "lm")
 
 
 
