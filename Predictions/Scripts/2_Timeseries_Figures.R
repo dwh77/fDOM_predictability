@@ -67,7 +67,7 @@ densts <- eval |> select(Date, Diff_Dens_1_max) |> mutate(Diff_Dens_1_max = roun
 
 strat_plot <- eval |> ggplot(aes(x = Date, y = Diff_Dens_1_max))+ geom_point()
 strat_plot
-# plotly::ggplotly(strat_plot)
+plotly::ggplotly(strat_plot)
 
 #chla
 chla_plot <- eval |> ggplot(aes(x = Date, y = Chla_1_ugL_daily))+ geom_point()
@@ -90,6 +90,7 @@ temp_plot
 ## Display order: fDOM, stratification, DO, chla, Q, DOC
 driver_order <- c("fDOM_1_QSU_daily", "Temp_1_C_daily", "Diff_Dens_1_max", "DOsat_1_pct_daily",
                    "Chla_1_ugL_daily", "RH_Q_cms", "RH_DOC_mgL")
+
 
 ## Y-axis label per variable
 driver_labels <- list(
@@ -152,94 +153,35 @@ ccr_depth_plot <- waterlevel |>
 
 ccr_depth_plot
 
-
-## HPB flow
-hpb_flow_plot <- local_flow |>
-  mutate(Interp = ifelse(is.na(HPB_Q_cms), "Interp", "Observed")) |>
-  select(Date, HPBinterp_Q_cms, Interp) |>
-  filter(Date >= ymd("2021-08-19"), Date <= ymd("2026-01-31")) |>
-  ggplot(aes(x = Date, y = HPBinterp_Q_cms, shape = Interp ))+
-  geom_point()+
-  labs(x = "Date", y = "HPB \n Discharge (cms)")+
-  scale_shape_manual(values = c("Observed" = 16, "Interp" = 5), guide = "none")+
-  geom_vline(xintercept = ymd("2024-01-01"), linetype = 2, linewidth = 1.2, color = "red")+
-  theme_bw() + theme(legend.position = "none", text = element_text(size = 14),
-                     axis.title.y.left = element_text(size = 12))
-
-hpb_flow_plot
-
-#join
-hydroSI <- wrap_plots(hpb_flow_plot, ccr_depth_plot, ncol = 1) +
-  plot_layout(axis_titles = "collect", axes = "collect_x") +
-  plot_annotation(tag_levels = "a") &
-  theme(plot.tag = element_text(size = 16, face = "bold"))
-
-hydroSI
-
-# ggsave("./Predictions/Figures/HydroSI.png", hydroSI,
-#        height = 4, width = 6, units = "in")
+# ggsave("./Predictions/Figures/ccr_waterlevel_SI.png", ccr_depth_plot,
+#        height = 3, width = 5, units = "in")
 
 
-#################### OLD ###########################
-
-# #### Figure 3 for MS ----
-# fdomTS <- eval |>
-#   filter(Date <= ymd("2026-01-31")) |>
-#   ggplot(aes(x = Date, y = fDOM_1_QSU_daily ))+
-#   #ggplot(aes(x = Date, y = fDOM_1m_obs, col = HighVar))+
-#   geom_point()+
-#   labs(x = "Date", y = "fDOM (QSU)")+
-#   #scale_color_manual(values = highvar_colors)+
-#   geom_vline(xintercept = ymd("2024-01-01"), linetype = 2, linewidth = 1.2, color = "red")+
-#   theme_bw() + theme(legend.position = "none", text = element_text(size = 18))
-#
-# fdomTS
-#
-# ## Density
-# dens_colors <- c("Mixed" = "red", "Strat" = "black")
-#
-# stratTS <- eval |>
-#   select(Date, Diff_Dens_1_max) |>
-#   mutate(Strat = ifelse(Diff_Dens_1_max > 0.1, "Strat", "Mixed")) |>
-#   filter(!is.na(Strat)) |>
-#   ggplot(aes(x = Date, y = Diff_Dens_1_max, col = Strat))+
-#   geom_point()+
-#   labs(x = "Date", y = expression("Density \n Diff (kg m"^-3*")"), color = "Stratified")+
-#   scale_color_manual(values = dens_colors)+
-#   geom_vline(xintercept = ymd("2024-01-01"), linetype = 2, linewidth = 1.2, color = "red")+
-#   #scale_x_date(date_labels = "%b %Y", date_breaks = "6 months")+
-#   theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
-#
-# stratTS
-#
-# ## Flow TS
-# Flow_colors <- c("Low flow" = "#D55E00", "High flow" = "#0072B2") #, "Normal" = "black"
-#
-# flowTS <- local_flow |>
+# ## HPB flow
+# hpb_flow_plot <- local_flow |>
 #   mutate(Interp = ifelse(is.na(HPB_Q_cms), "Interp", "Observed")) |>
-#   select(Date, HPB_Q_cms_filled, flow_class_hpb, Interp) |>
+#   select(Date, HPBinterp_Q_cms, Interp) |>
 #   filter(Date >= ymd("2021-08-19"), Date <= ymd("2026-01-31")) |>
-#   #make non categorized flow classes not gray
-#   mutate(flow_class_hpb = ifelse(is.na(flow_class_hpb), "Normal", flow_class_hpb)) |>
-#   ggplot(aes(x = Date, y = HPB_Q_cms_filled, col = flow_class_hpb, shape = Interp))+
+#   ggplot(aes(x = Date, y = HPBinterp_Q_cms, shape = Interp ))+
 #   geom_point()+
-#   labs(x = "Date", y = "Flow (cms)", color = "Flow Classification during predictions")+
-#   scale_color_manual(values = Flow_colors)+
-#   scale_shape_manual(values = c("Observed" = 16, "Interp" = 17), guide = "none")+
-#   scale_y_log10()+
-#   # scale_x_date(date_labels = "%b %y", date_breaks = "6 months")+
+#   labs(x = "Date", y = "HPB \n Discharge (cms)")+
+#   scale_shape_manual(values = c("Observed" = 16, "Interp" = 5), guide = "none")+
 #   geom_vline(xintercept = ymd("2024-01-01"), linetype = 2, linewidth = 1.2, color = "red")+
-#   theme_bw() + theme(legend.position = "top", text = element_text(size = 18))
+#   theme_bw() + theme(legend.position = "none", text = element_text(size = 14),
+#                      axis.title.y.left = element_text(size = 12))
 #
-# flowTS
+# hpb_flow_plot
 #
-#
-# ##Join
-# fdomTS / stratTS / flowTS +
+# #join
+# hydroSI <- wrap_plots(hpb_flow_plot, ccr_depth_plot, ncol = 1) +
 #   plot_layout(axis_titles = "collect", axes = "collect_x") +
 #   plot_annotation(tag_levels = "a") &
-#   theme(plot.tag = element_text(size = 18, face = "bold"),
-#         legend.position = "top")
+#   theme(plot.tag = element_text(size = 16, face = "bold"))
+#
+# hydroSI
+
+# #ggsave("./Predictions/Figures/HydroSI.png", hydroSI,
+#       # height = 4, width = 6, units = "in")
 
 
 
